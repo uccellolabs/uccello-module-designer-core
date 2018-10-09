@@ -1,6 +1,6 @@
 <?php
 
-Route::name('uccello.module_designer.')->group(function () {
+Route::name('uccello.module-designer.')->group(function () {
 
     // Adapt params if we use or not multi domains
     if (!uccello()->useMultiDomains()) {
@@ -12,8 +12,8 @@ Route::name('uccello.module_designer.')->group(function () {
     }
 
     // Default routes
-    Route::get($domainAndModuleParams . '/module_designer/install', 'DesignerController@install')->name('install');
-    Route::get($domainAndModuleParams . '/module_designer/create', 'DesignerController@create')->name('create');
-    Route::get($domainAndModuleParams . '/module_designer/update', 'DesignerController@update')->name('update');
-    Route::get($domainAndModuleParams . '/module_designer/settings', 'DesignerController@settings')->name('settings');
+    Route::get($domainAndModuleParams . '/install', 'InstallController@process')->name('install');
+    Route::get($domainAndModuleParams . '/create', 'CreateController@process')->name('create');
+    Route::get($domainAndModuleParams . '/update', 'UpdateController@process')->name('update');
+    Route::get($domainAndModuleParams . '/settings', 'SettingsController@process')->name('settings');
 });

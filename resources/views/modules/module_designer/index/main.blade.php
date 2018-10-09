@@ -10,19 +10,19 @@
                 <div class="row">
                     <div class="col-md-4 col-md-offset-4">
                         <div class="list-group">
-                            <a href="javascript:void(0);" class="list-group-item">
+                            <a href="{{ ucroute('uccello.module-designer.install', $domain, $module )}}" class="list-group-item">
                                 {{ uctrans('menu.install_module', $module) }}
                             </a>
-                            <a href="javascript:void(0);" class="list-group-item">
+                            <a href="{{ ucroute('uccello.module-designer.create', $domain, $module )}}" class="list-group-item">
                                 {{ uctrans('menu.create_module', $module) }}
                             </a>
-                            <a href="javascript:void(0);" class="list-group-item">
+                            <a href="{{ ucroute('uccello.module-designer.update', $domain, $module )}}" class="list-group-item">
                                 {{ uctrans('menu.update_module', $module) }}
                             </a>
-                            <a href="javascript:void(0);" class="list-group-item">
+                            <a href="{{ ucroute('uccello.module-designer.settings', $domain, $module )}}" class="list-group-item">
                                 {{ uctrans('menu.settings', $module) }}
                             </a>
-                            {{-- <a href="javascript:void(0);" class="list-group-item">
+                            {{-- <a href="{{ ucroute('uccello.module-designer.workflows', $domain, $module )}}" class="list-group-item">
                                 {{ uctrans('menu.workflows', $module) }}
                             </a> --}}
                         </div>
