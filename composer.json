@@ -28,7 +28,8 @@
         },
         "laravel": {
             "providers": [
-                "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider"
+                "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider",
+                "Uccello\\ModuleDesigner\\Providers\\RouteServiceProvider"
             ]
         }
     }

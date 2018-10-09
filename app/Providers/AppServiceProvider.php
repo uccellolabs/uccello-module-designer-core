@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'module-designer');
 
     // Translations
-    $this->loadTranslationsFrom(__DIR__ . '/../../resources/lang', 'uccello');
+    $this->loadTranslationsFrom(__DIR__ . '/../../resources/lang', 'module-designer');
 
     // Migrations
     $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
