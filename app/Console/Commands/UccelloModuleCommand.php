@@ -3,8 +3,7 @@
 namespace Uccello\ModuleDesigner\Console\Commands;
 
 use Illuminate\Console\Command;
-use Uccello\Core\Models\Designer;
-use Uccello\Core\Models\DesignedModule;
+use Uccello\ModuleDesigner\Models\DesignedModule;
 
 class UccelloModuleCommand extends Command
 {
