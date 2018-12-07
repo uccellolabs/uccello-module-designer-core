@@ -30,4 +30,9 @@ class DesignedModule extends Model
     protected $fillable = [
         'name', 'data',
     ];
+
+    protected function setTablePrefix()
+    {
+        $this->tablePrefix = env('UCCELLO_TABLE_PREFIX', 'uccello_');
+    }
 }

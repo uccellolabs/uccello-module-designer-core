@@ -27,13 +27,13 @@ class CreateModuleDesignerStructure extends Migration
      */
     public function down()
     {
-        Module::where('name', 'module_designer')->forceDelete();
+        Module::where('name', 'module-designer')->forceDelete();
     }
 
     protected function createModule()
     {
         $module = new  Module();
-        $module->name = 'module_designer';
+        $module->name = 'module-designer';
         $module->icon = 'brush';
         $module->model_class = null;
         $module->data = ["package" => "module-designer", "admin" => true, "route" => "uccello.index"];

@@ -3,7 +3,7 @@
 namespace Uccello\ModuleDesigner\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Uccello\ModuleDesigner\Console\Commands\UccelloModuleCommand;
+use Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand;
 
 /**
  * App Service Provider
@@ -28,10 +28,15 @@ class AppServiceProvider extends ServiceProvider
     // Migrations
     $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
 
+    // Publish assets
+    $this->publishes([
+      __DIR__ . '/../../public' => public_path('vendor/uccello/module-designer'),
+    ], 'assets'); // CSS
+
     // Commands
     if ($this->app->runningInConsole()) {
       $this->commands([
-        UccelloModuleCommand::class,
+        MakeModuleCommand::class,
       ]);
     }
   }
