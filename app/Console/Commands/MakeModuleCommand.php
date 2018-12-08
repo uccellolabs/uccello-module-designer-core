@@ -371,14 +371,14 @@ class MakeModuleCommand extends Command
         // Displaytype
         $field->displaytype = $this->choice('Choose a display type', $this->getDisplaytypes(), 'everywhere');
 
-        // Add specific options according to the selected uitype ($field is modified directly in the called function)
-        uitype($field->uitype)->askFieldOptions($this->module, $field, $this->input, $this->output);
-
         // Ask the user if the field is required
         $required = $this->confirm('Is the field required?');
         if ($required) {
             $field->data->rules = "required";
         }
+
+        // Add specific options according to the selected uitype ($field is modified directly in the called function)
+        uitype($field->uitype)->askFieldOptions($this->module, $field, $this->input, $this->output);
 
         //TODO:: Ask for other rules
 
