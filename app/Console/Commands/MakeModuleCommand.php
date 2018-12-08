@@ -377,10 +377,31 @@ class MakeModuleCommand extends Command
             $field->data->rules = "required";
         }
 
+        // Large
+        $large = $this->confirm('Display the field in two columns?', false);
+        if ($large) {
+            $field->data->large = true;
+        }
+
+        // Default value
+        $default = $this->ask('Default value');
+        if (!is_null($default)) {
+            $field->data->default = $default;
+        }
+
+        // Other rules
+        $rules = $this->ask('Other rules (See https://laravel.com/docs/5.7/validation#available-validation-rules)');
+        if (!is_null($rules)) {
+            // Add to previous rules if defined
+            if (!empty($field->data->rules)) {
+                $rules = $field->data->rules . '|' . $rules;
+            }
+
+            $field->data->rules = $rules;
+        }
+
         // Add specific options according to the selected uitype ($field is modified directly in the called function)
         uitype($field->uitype)->askFieldOptions($this->module, $field, $this->input, $this->output);
-
-        //TODO:: Ask for other rules
 
         // Sequence
         if (count($block->fields) > 0) {
