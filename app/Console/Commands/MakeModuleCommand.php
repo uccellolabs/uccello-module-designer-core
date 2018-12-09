@@ -10,17 +10,15 @@ use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Uccello\Core\Models\Displaytype;
-use Uccello\Core\Models\Domain;
-use Uccello\Core\Models\Filter;
+use Uccello\Core\Support\ModuleImport;
 
 class MakeModuleCommand extends Command
 {
     /**
      * The structure of the module.
      *
-     * @var string
+     * @var \StdClass
      */
     protected $module;
 
@@ -552,10 +550,11 @@ class MakeModuleCommand extends Command
 
         // Label
         $relatedListIndex = count($this->module->relatedLists)+1;
-        $relatedList->label = $this->ask('Choose a label (will be translated)', 'relatedlist.' . 'relatedlist'.$relatedListIndex);
+        $defaultLabel = 'relatedlist.' . 'relatedlist'.$relatedListIndex;
+        $relatedList->label = $this->ask('Choose a label (will be translated)', $defaultLabel);
 
         // Translation
-        $this->module->lang->{$this->locale}->{'relatedlist.' . $relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->{$relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Type
         $relatedList->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
@@ -575,7 +574,8 @@ class MakeModuleCommand extends Command
         // Tab
         $displayInTab = $this->confirm('Do you want to display it in an existant tab? By default it will create a new tab.', false);
         if ($displayInTab) {
-            $relatedList->tab = $this->selectTab();
+            $tab = $this->selectTab();
+            $relatedList->tab = $tab->label;
         } else {
             $relatedList->tab = null;
         }
@@ -585,7 +585,7 @@ class MakeModuleCommand extends Command
         $method = $this->ask('Choose a method', $defaultMethod);
 
         // Actions
-        if ($relatedList->type === '1-n') {
+        if ($relatedList->type === 'n-1') {
             $actionsChoices = [
                 'add',
                 'Nothing'
@@ -808,251 +808,14 @@ class MakeModuleCommand extends Command
     }
 
     /**
-     * Generate all files and database structure to install the new module
+     * Install module
      *
      * @return void
      */
-    protected function installModule()
+    public function installModule()
     {
-        // Create module structure
-        $module = $this->createModuleStructure();
-
-        // Create module table
-        $this->createModuleTable($module);
-
-        // Activate module on all domains
-        $this->activateModuleOnDomain($module);
-
-        // Create default filter
-        $this->createDefaultFilter($module);
-
-        // Create language file
-        $this->createLanguageFile($module);
-
-        // Create model file
-        $this->createModelFile($module);
-    }
-
-    /**
-     * Create module structure in the database
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function createModuleStructure()
-    {
-        // Create new module
-        $module = new Module([
-            'name' => $this->module->name,
-            'icon' => $this->module->icon,
-            'model_class' => $this->module->model,
-        ]);
-        $module->save(); //TODO: or update
-
-        // Create tabs
-        foreach ($this->module->tabs as $_tab) {
-
-            $tab = new Tab([
-                'label' => $tab->label,
-                'icon' => $tab->icon,
-                'sequence' => $tab->sequence,
-                'module_id' => $module->id,
-            ]);
-            $tab->save();
-
-            // Create blocks
-            foreach ($tab->blocks as $_block) {
-                $block = new Block([
-                    'label' => $_block->label,
-                    'icon' => $_block->icon,
-                    'sequence' => $_block->sequence,
-                    'tab_id' => $tab->id,
-                    'module_id' => $module->id,
-                ]);
-                $block->save();
-
-                // Create fields
-                foreach ($_block->fields as $_field) {
-                    $field = new Field([
-                        'name' => $_field->name,
-                        'sequence' => $_field->sequence,
-                        'data' => $_field->data ?? null,
-                        'uitype_id' => uitype($_field->uitype)->id,
-                        'displaytype_id' => displaytype($_field->displaytype)->id,
-                        'block_id' => $block->id,
-                        'module_id' => $module->id,
-                    ]);
-                    $field->save();
-                }
-            }
-        }
-
-        return $module;
-    }
-
-    /**
-     * Create module table from fields information
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function createModuleTable(Module $module)
-    {
-        Schema::create($this->module->tablePrefix . $this->module->tableName, function (Blueprint $table) use ($module) {
-            $table->increments('id');
-
-            // Create each column according to the selected uitype
-            foreach ($module->fields as $field) {
-                // Do not recreate id
-                if ($field->name === 'id') {
-                    continue;
-                }
-
-                // Get field rules
-                if (isset($field->data->rules)) {
-                    $rules = explode('|', $field->data->rules);
-                } else {
-                    $rules = [];
-                }
-
-                $column = uitype($field->uitype->id)->createFieldColumn($field, $table);
-
-                // Add nullable() if the field is not required
-                if (!in_array('required', $rules)) {
-                    $column->nullable();
-                }
-            }
-
-            $table->timestamps();
-            $table->softDeletes();
-        });
-    }
-
-    /**
-     * Create default filter
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function createDefaultFilter(Module $module)
-    {
-        // Add all field in the filter
-        $columns = [];
-        foreach ($module->fields as $field) { //TODO: Choose fields to display in filter
-            $columns[] = $field->name;
-        }
-
-        $filter = new Filter();
-        $filter->module_id = $module->id;
-        $filter->domain_id = null;
-        $filter->user_id = null;
-        $filter->name = 'filter.all';
-        $filter->type = 'list';
-        $filter->columns = $columns;
-        $filter->conditions = null;
-        $filter->order_by = null;
-        $filter->is_default = true;
-        $filter->is_public = false;
-        $filter->save();
-    }
-
-    /**
-     * Activate module on all domains
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function activateModuleOnDomain(Module $module)
-    {
-        $domains = Domain::all();
-
-        foreach($domains as $domain) {
-            $domain->modules()->attach($module);
-        }
-    }
-
-    /**
-     * Create language file
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function createLanguageFile(Module $module)
-    {
-        $languageFile = 'resources/lang/' . $this->locale . '/' . $this->module->name . '.php';
-
-        if (!file_exists($languageFile)) {
-            $content = "<?php\n\n".
-                        "return [\n";
-
-            foreach ($this->module->lang->{$this->locale} as $key => $val) {
-                $content .= "    '$key' => '". str_replace("'", "\'", $val) ."',\n";
-            }
-
-            $content .= "];";
-
-            file_put_contents($languageFile, $content);
-        }
-    }
-
-    /**
-     * Create model file
-     *
-     * @param Module $module
-     * @return void
-     */
-    protected function createModelFile(Module $module)
-    {
-        $modelClassData = explode("\\", $this->module->model);
-
-        // Extract class name
-        $className = $modelClassData[count($modelClassData) - 1];
-
-        // Extract namespace
-        $namespace = str_replace("\\$className", "", $this->module->model);
-
-        // File path
-        $modelFile = "app/$className.php";
-
-        if (file_exists($modelFile)) {
-            return false;
-        }
-
-        // Generate relations
-        $relations = "";
-        foreach ($this->getAllFields() as $field) {
-            if ($field->uitype === 'entity') {
-                $relatedModule = Module::where('name', $field->data->module)->first();
-
-                if ($relatedModule) {
-                    $relations .= "    public function ". $field->name . "()\n".
-                                "    {\n".
-                                "        return \$this->belongsTo(\\". $relatedModule->model_class . "::class);\n".
-                                "    }\n\n";
-                }
-            }
-        }
-
-        // Generate content
-        $content = "<?php\n\n".
-                    "namespace $namespace;\n\n".
-                    "use Illuminate\Database\Eloquent\Model;\n".
-                    "\n".
-                    "class $className extends Model\n".
-                    "{\n".
-                    $relations.
-                    "    /**\n".
-                    "    * Returns record label\n".
-                    "    *\n".
-                    "    * @return string\n".
-                    "    */\n".
-                    "    public function getRecordLabelAttribute() : string\n".
-                    "    {\n".
-                    "        return \$this->id;\n".
-                    "    }\n".
-                    "}";
-
-        file_put_contents($modelFile, $content);
+        $import = new ModuleImport();
+        $import->install($this->module);
     }
 
     /**
