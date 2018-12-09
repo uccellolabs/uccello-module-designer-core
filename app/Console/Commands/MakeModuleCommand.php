@@ -25,6 +25,13 @@ class MakeModuleCommand extends Command
     protected $module;
 
     /**
+     * The default locale.
+     *
+     * @var string
+     */
+    protected $locale;
+
+    /**
      * The name and signature of the console command.
      *
      * @var string
@@ -46,6 +53,8 @@ class MakeModuleCommand extends Command
     public function __construct()
     {
         parent::__construct();
+
+        $this->locale = \Lang::getLocale();
     }
 
     /**
@@ -219,9 +228,15 @@ class MakeModuleCommand extends Command
 
         // Create an empty object
         $this->module = new \stdClass();
+        $this->module->lang = new \StdClass();
+        $this->module->lang->{$this->locale} = new \StdClass();
 
         // Name
         $this->module->name = snake_case($moduleName);
+
+        // Translation
+        $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural (' . $this->locale . ')');
+        $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single (' . $this->locale . ')');
 
         // Model class
         $defaultModelClass = 'App\\' . studly_case($moduleName); // The studly_case function converts the given string to StudlyCase
@@ -285,6 +300,9 @@ class MakeModuleCommand extends Command
         // Label
         $defaultLabel = count($this->module->blocks) === 0 ? 'block.general' : 'block.block' . count($this->module->blocks);
         $block->label = $this->ask('Block label (will be translated)', $defaultLabel);
+
+        // Translation
+        $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation (' . $this->locale . ')');
 
         // Icon
         $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
@@ -353,7 +371,7 @@ class MakeModuleCommand extends Command
         $field->data = new \StdClass();
 
         // Name
-        $field->name = $this->ask('Field name (will be translated)');
+        $field->name = $this->ask('Field name');
         $field->name = snake_case($field->name);
 
         // Check if the name already exists
@@ -364,6 +382,9 @@ class MakeModuleCommand extends Command
                 return;
             }
         }
+
+        // Translation
+        $this->module->lang->{$this->locale}->{'field.' . $field->name} = $this->ask('Translation (' . $this->locale . ')');
 
         // Uitype
         $field->uitype = $this->choice('Choose an uitype', $this->getUitypes(), 'text');
@@ -479,6 +500,11 @@ class MakeModuleCommand extends Command
         // Create default filter
         $this->createDefaultFilter($module);
 
+        // Create language file
+        $this->createLanguageFile($module);
+
+        // Create model file
+        $this->createModelFile($module);
     }
 
     /**
@@ -549,6 +575,10 @@ class MakeModuleCommand extends Command
 
             // Create each column according to the selected uitype
             foreach ($module->fields as $field) {
+                // Do not recreate id
+                if ($field->name === 'id') {
+                    continue;
+                }
 
                 // Get field rules
                 if (isset($field->data->rules)) {
@@ -580,7 +610,7 @@ class MakeModuleCommand extends Command
     {
         // Add all field in the filter
         $columns = [];
-        foreach ($module->fields as $field) {
+        foreach ($module->fields as $field) { //TODO: Choose fields to display in filter
             $columns[] = $field->name;
         }
 
@@ -611,6 +641,90 @@ class MakeModuleCommand extends Command
         foreach($domains as $domain) {
             $domain->modules()->attach($module);
         }
+    }
+
+    /**
+     * Create language file
+     *
+     * @param Module $module
+     * @return void
+     */
+    protected function createLanguageFile(Module $module)
+    {
+        $languageFile = 'resources/lang/' . $this->locale . '/' . $this->module->name . '.php';
+
+        if (!file_exists($languageFile)) {
+            $content = "<?php\n\n".
+                        "return [\n";
+
+            foreach ($this->module->lang->{$this->locale} as $key => $val) {
+                $content .= "    '$key' => '". str_replace("'", "\'", $val) ."',\n";
+            }
+
+            $content .= "];";
+
+            file_put_contents($languageFile, $content);
+        }
+    }
+
+    /**
+     * Create model file
+     *
+     * @param Module $module
+     * @return void
+     */
+    protected function createModelFile(Module $module)
+    {
+        $modelClassData = explode("\\", $this->module->model);
+
+        // Extract class name
+        $className = $modelClassData[count($modelClassData) - 1];
+
+        // Extract namespace
+        $namespace = str_replace("\\$className", "", $this->module->model);
+
+        // File path
+        $modelFile = "app/$className.php";
+
+        if (file_exists($modelFile)) {
+            return false;
+        }
+
+        // Generate relations
+        $relations = "";
+        foreach ($this->getAllFields() as $field) {
+            if ($field->uitype === 'entity') {
+                $relatedModule = Module::where('name', $field->data->module)->first();
+
+                if ($relatedModule) {
+                    $relations .= "    public function ". $field->name . "()\n".
+                                "    {\n".
+                                "        return \$this->belongsTo(\\". $relatedModule->model_class . "::class);\n".
+                                "    }\n\n";
+                }
+            }
+        }
+
+        // Generate content
+        $content = "<?php\n\n".
+                    "namespace $namespace;\n\n".
+                    "use Illuminate\Database\Eloquent\Model;\n".
+                    "\n".
+                    "class $className extends Model\n".
+                    "{\n".
+                    $relations.
+                    "    /**\n".
+                    "    * Returns record label\n".
+                    "    *\n".
+                    "    * @return string\n".
+                    "    */\n".
+                    "    public function getRecordLabelAttribute() : string\n".
+                    "    {\n".
+                    "        return \$this->id;\n".
+                    "    }\n".
+                    "}";
+
+        file_put_contents($modelFile, $content);
     }
 
     /**
