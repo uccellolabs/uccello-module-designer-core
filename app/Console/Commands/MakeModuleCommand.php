@@ -149,6 +149,7 @@ class MakeModuleCommand extends Command
         // Default choices
         $choices = [
             'Create a new module',
+            'Add a tab',
             'Add a block',
             'Add a field',
             'Add a related list',
@@ -171,33 +172,38 @@ class MakeModuleCommand extends Command
                 $this->createModule();
                 break;
 
-            // Add a block
+            // Add a tab
             case $choices[1]:
+                $this->createTab();
+                break;
+
+            // Add a block
+            case $choices[2]:
                 $this->createBlock();
                 break;
 
             // Add a field
-            case $choices[2]:
+            case $choices[3]:
                 $this->createField();
                 break;
 
             // Add a related list
-            case $choices[3]:
+            case $choices[4]:
                 $this->createRelatedList();
                 break;
 
             // Add a link
-            case $choices[4]:
+            case $choices[5]:
                 $this->createLink();
                 break;
 
             // Install module
-            case $choices[5]:
+            case $choices[6]:
                 $this->installModule();
                 break;
 
             // Exit
-            case $choices[6]:
+            case $choices[7]:
                 // Do nothing
                 break;
         }
@@ -235,8 +241,8 @@ class MakeModuleCommand extends Command
         $this->module->name = snake_case($moduleName);
 
         // Translation
-        $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural (' . $this->locale . ')');
-        $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single (' . $this->locale . ')');
+        $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single [' . $this->locale . ']');
 
         // Model class
         $defaultModelClass = 'App\\' . studly_case($moduleName); // The studly_case function converts the given string to StudlyCase
@@ -283,26 +289,96 @@ class MakeModuleCommand extends Command
     }
 
     /**
+     * Ask the user information to make the a new tab.
+     *
+     * @return void
+     */
+    protected function createTab()
+    {
+        // Initialize tabs list if necessary
+        if (!isset($this->module->tabs)) {
+            $this->module->tabs = [];
+        }
+
+        $tab = new \StdClass();
+        $tab->blocks = [];
+
+        // Label
+        $defaultLabel = count($this->module->tabs) === 0 ? 'tab.main' : 'tab.tab' . count($this->module->tabs);
+        $tab->label = $this->ask('Tab label (will be translated)', $defaultLabel);
+
+        // Translation
+        $this->module->lang->{$this->locale}->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
+
+        // Icon
+        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
+        if (strtoupper($icon) === 'NULL') {
+            $icon = null;
+        }
+        $tab->icon = $icon;
+
+        // Sequence
+        if (count($this->module->tabs) > 0) {
+
+            $choices = [];
+            foreach ($this->module->tabs as $moduleTab) {
+                $choices[] = 'Before - ' . $moduleTab->label;
+                $choices[] = 'After - ' . $moduleTab->label;
+            }
+
+            $position = $this->choice('Where do you want to add this tab?', $choices, $choices[count($choices)-1]);
+            $tabIndex = floor(array_search($position, $choices) / 2);
+
+            $tab->sequence = preg_match('`After`', $position) ? $tabIndex + 1 : $tabIndex;
+
+        } else {
+            $tab->sequence = 0;
+        }
+
+        // Update other blocks sequence
+        foreach ($this->module->tabs as &$moduleTab) {
+            if ($moduleTab->sequence >= $tab->sequence) {
+                $moduleTab->sequence += 1;
+            }
+        }
+
+        // Add tab
+        $this->module->tabs[] = $tab;
+
+        // Sort tabs by sequence
+        usort($this->module->tabs, [$this, 'sortBySequence']);
+
+        // Save module structure
+        $this->saveModuleStructure();
+
+        // Ask user to choose another action (Default: Add a block)
+        $this->chooseAction(2);
+    }
+
+    /**
      * Ask the user information to make the a new block.
      *
      * @return void
      */
     protected function createBlock()
     {
+        // Select a tab
+        $tab = $this->selectTab();
+
         // Initialize blocks list if necessary
-        if (!isset($this->module->blocks)) {
-            $this->module->blocks = [];
+        if (!isset($tab->blocks)) {
+            $tab->blocks = [];
         }
 
         $block = new \StdClass();
         $block->fields = [];
 
         // Label
-        $defaultLabel = count($this->module->blocks) === 0 ? 'block.general' : 'block.block' . count($this->module->blocks);
+        $defaultLabel = count($tab->blocks) === 0 ? 'block.general' : 'block.block' . count($tab->blocks);
         $block->label = $this->ask('Block label (will be translated)', $defaultLabel);
 
         // Translation
-        $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation (' . $this->locale . ')');
+        $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
         $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
@@ -312,10 +388,10 @@ class MakeModuleCommand extends Command
         $block->icon = $icon;
 
         // Sequence
-        if (count($this->module->blocks) > 0) {
+        if (count($tab->blocks) > 0) {
 
             $choices = [];
-            foreach ($this->module->blocks as $moduleBlock) {
+            foreach ($tab->blocks as $moduleBlock) {
                 $choices[] = 'Before - ' . $moduleBlock->label;
                 $choices[] = 'After - ' . $moduleBlock->label;
             }
@@ -330,23 +406,23 @@ class MakeModuleCommand extends Command
         }
 
         // Update other blocks sequence
-        foreach ($this->module->blocks as &$moduleBlock) {
+        foreach ($tab->blocks as &$moduleBlock) {
             if ($moduleBlock->sequence >= $block->sequence) {
                 $moduleBlock->sequence += 1;
             }
         }
 
         // Add block
-        $this->module->blocks[] = $block;
+        $tab->blocks[] = $block;
 
         // Sort blocks by sequence
-        usort($this->module->blocks, [$this, 'sortBySequence']);
+        usort($tab->blocks, [$this, 'sortBySequence']);
 
         // Save module structure
         $this->saveModuleStructure();
 
         // Ask user to choose another action (Default: Add a field)
-        $this->chooseAction(2);
+        $this->chooseAction(3);
     }
 
     /**
@@ -384,7 +460,7 @@ class MakeModuleCommand extends Command
         }
 
         // Translation
-        $this->module->lang->{$this->locale}->{'field.' . $field->name} = $this->ask('Translation (' . $this->locale . ')');
+        $this->module->lang->{$this->locale}->{'field.' . $field->name} = $this->ask('Translation [' . $this->locale . ']');
 
         // Uitype
         $field->uitype = $this->choice('Choose an uitype', $this->getUitypes(), 'text');
@@ -458,7 +534,7 @@ class MakeModuleCommand extends Command
         $this->saveModuleStructure();
 
         // Ask user to choose another action (Default: Add a field)
-        $this->chooseAction(2);
+        $this->chooseAction(3);
     }
 
     /**
@@ -468,7 +544,106 @@ class MakeModuleCommand extends Command
      */
     protected function createRelatedList()
     {
-        //TODO:
+        if (!isset($this->module->relatedLists)) {
+            $this->module->relatedLists = [];
+        }
+
+        $relatedList = new \StdClass();
+
+        // Label
+        $relatedListIndex = count($this->module->relatedLists)+1;
+        $relatedList->label = $this->ask('Choose a label (will be translated)', 'relatedlist.' . 'relatedlist'.$relatedListIndex);
+
+        // Translation
+        $this->module->lang->{$this->locale}->{'relatedlist.' . $relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
+
+        // Type
+        $relatedList->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
+        $relatedList->type = str_replace('Relation ', '', $relatedList->type);
+
+        // Related Module
+        $relatedModule = $this->selectModule('Select the related module');
+
+        // Related field
+        if ($relatedList->type === 'n-1') {
+            $relatedField = $this->selectField($relatedModule);
+            $relatedList->related_field_id = $relatedField->id;
+        } else {
+            $relatedList->related_field_id = null;
+        }
+
+        // Tab
+        $displayInTab = $this->confirm('Do you want to display it in an existant tab? By default it will create a new tab.', false);
+        if ($displayInTab) {
+            $relatedList->tab = $this->selectTab();
+        } else {
+            $relatedList->tab = null;
+        }
+
+        // Method
+        $defaultMethod = $relatedList->type === 'n-n' ? 'getRelatedList' : 'getDependentList';
+        $method = $this->ask('Choose a method', $defaultMethod);
+
+        // Actions
+        if ($relatedList->type === '1-n') {
+            $actionsChoices = [
+                'add',
+                'Nothing'
+            ];
+        } else {
+            $actionsChoices = [
+                'add',
+                'select',
+                'add,select',
+                'Nothing'
+            ];
+        }
+        $actionsAnswer = $this->choice('Choose available actions', $actionsChoices, 'Nothing');
+        $relatedList->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
+
+        // Icon
+        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
+        if (strtoupper($icon) === 'NULL') {
+            $icon = null;
+        }
+        $relatedList->icon = $icon;
+
+        // Sequence
+        if (count($this->module->relatedLists) > 0) {
+
+            $choices = [];
+            foreach ($this->module->relatedLists as $moduleRelatedList) {
+                $choices[] = 'Before - ' . $moduleRelatedList->label;
+                $choices[] = 'After - ' . $moduleRelatedList->label;
+            }
+
+            $position = $this->choice('Where do you want to add this related list?', $choices, $choices[count($choices)-1]);
+            $relatedListIndex = floor(array_search($position, $choices) / 2);
+
+            $relatedList->sequence = preg_match('`After`', $positionAnswer) ? $relatedListIndex + 1 : $relatedListIndex;
+
+        } else {
+            $relatedList->sequence = 0;
+        }
+
+        // Update other related lists sequence
+        foreach ($this->module->relatedLists as &$moduleRelatedList) {
+            if ($moduleRelatedList->sequence >= $relatedList->sequence) {
+                $moduleRelatedList->sequence += 1;
+            }
+        }
+
+        // Add related list
+        $this->module->relatedLists[] = $relatedList;
+
+        // Sort fields by sequence
+        usort($this->module->relatedLists, [$this, 'sortBySequence']);
+
+        // Save module structure
+        $this->saveModuleStructure();
+
+        // Ask user to choose another action (Default: Add a related list)
+        $this->chooseAction(4);
     }
 
     /**
@@ -478,7 +653,158 @@ class MakeModuleCommand extends Command
      */
     protected function createLink()
     {
-        //TODO:
+        // Initialize links list if necessary
+        if (!isset($this->module->links)) {
+            $this->module->links = [];
+        }
+
+        $link = new \StdClass();
+        $link->data = new \StdClass();
+
+        // Label
+        $defaultLabel = 'link.link' . count($this->module->links);
+        $link->label = $this->ask('Link label (will be translated)', $defaultLabel);
+
+        // Translation
+        $this->module->lang->{$this->locale}->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
+
+        // Icon
+        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
+        if (strtoupper($icon) === 'NULL') {
+            $icon = null;
+        }
+        $link->icon = $icon;
+
+        // Type
+        $link->type = $this->choice('Type of link', ['detail', 'detail.action'], 'detail');
+
+        // URL
+        $link->url = $this->ask('URL');
+
+        // Action type
+        $link->data->actionType = $this->choice('Action type', ['link', 'ajax', 'modal'], 'link');
+
+        // Color
+        $link->data->color = $this->choice('Button color', [
+            'default',
+            'primary',
+            'success',
+            'info',
+            'warning',
+            'danger',
+            'red',
+            'pink',
+            'purple',
+            'deep-purple',
+            'indigo',
+            'blue',
+            'light-blue',
+            'cyan',
+            'teal',
+            'green',
+            'light-green',
+            'lime',
+            'yellow',
+            'amber',
+            'orange',
+            'deep-orange',
+            'brown',
+            'grey',
+            'blue-grey',
+            'black'
+        ], 'primary');
+
+        // Confirm
+        $confirm = $this->confirm('Do you want to show a confirm alert?', false);
+        if ($confirm) {
+            $link->data->confirm = true;
+
+            $customize = $this->confirm('Do you want to customize the confirm dialog?', false);
+            if ($customize) {
+                $link->data->dialog = new \StdClass();
+
+                $link->data->dialog->title = $this->ask('Title', 'Are you sure?');
+                $link->data->dialog->confirmButtonText = $this->ask('Confirm button text', 'Yes');
+                $link->data->dialog->confirmButtonColor = $this->ask('Confirm button color', '#DD6B55');
+                $link->data->dialog->closeOnConfirm = $this->confirm('Close dialog on confirm?', true);
+            }
+        }
+
+        // Add options according to action type
+        switch ($link->data->actionType) {
+            // Link
+            case 'link':
+                    // Target
+                    $target = $this->ask('Link target (e.g. _blank)');
+                    if (!is_null($target)) {
+                        $link->data->target = $target;
+                    }
+                break;
+
+            // Ajax
+            case 'ajax':
+                    $link->data->ajax = new \StdClass();
+
+                    // HTTP method
+                    $link->data->ajax->method = $this->choice('HTTP method', ['get', 'post', 'put', 'delete', 'head', 'patch', 'connect', 'options', 'trace'], 'get');
+
+                    // Query params
+                    $params = $this->ask('Query params');
+                    if (!is_null($params)) {
+                        $link->data->ajax->params = $params;
+                    }
+
+                    // Update DOM
+                    $updateDom = $this->confirm('Do you want to update the DOM?', false);
+                    if ($updateDom) {
+                        // Element to update
+                        $link->data->ajax->elementToUpdate = $this->ask('What is the DOM selector of the element to update? (e.g. .card:eq(1) .body)');
+                    }
+                break;
+
+            // Modal
+            case 'modal':
+                    $link->data->modal = new \StdClass();
+                    $link->data->modal->id = $this->ask('What is the id of the modal to show? (e.g. productModal)');
+                break;
+        }
+
+        // Sequence
+        if (count($this->module->links) > 0) {
+
+            $choices = [];
+            foreach ($this->module->links as $moduleLink) {
+                $choices[] = 'Before - ' . $moduleLink->label;
+                $choices[] = 'After - ' . $moduleLink->label;
+            }
+
+            $position = $this->choice('Where do you want to add this link?', $choices, $choices[count($choices)-1]);
+            $linkIndex = floor(array_search($position, $choices) / 2);
+
+            $link->sequence = preg_match('`After`', $position) ? $linkIndex + 1 : $linkIndex;
+
+        } else {
+            $link->sequence = 0;
+        }
+
+        // Update other links sequence
+        foreach ($this->module->links as &$moduleLink) {
+            if ($moduleLink->sequence >= $link->sequence) {
+                $moduleLink->sequence += 1;
+            }
+        }
+
+        // Add block
+        $this->module->links[] = $link;
+
+        // Sort blocks by sequence
+        usort($this->module->links, [$this, 'sortBySequence']);
+
+        // Save module structure
+        $this->saveModuleStructure();
+
+        // Ask user to choose another action (Default: Add a link)
+        $this->chooseAction(5);
     }
 
     /**
@@ -523,39 +849,41 @@ class MakeModuleCommand extends Command
         ]);
         $module->save(); //TODO: or update
 
-        // Create tab
-        // TODO: Multi tabs
-        $tab = new Tab([
-            'label' => 'tab.main',
-            'icon' => null,
-            'sequence' => 0,
-            'module_id' => $module->id,
-        ]);
-        $tab->save();
+        // Create tabs
+        foreach ($this->module->tabs as $_tab) {
 
-        // Create blocks
-        foreach ($this->module->blocks as $_block) {
-            $block = new Block([
-                'label' => $_block->label,
-                'icon' => $_block->icon,
-                'sequence' => $_block->sequence,
-                'tab_id' => $tab->id,
+            $tab = new Tab([
+                'label' => $tab->label,
+                'icon' => $tab->icon,
+                'sequence' => $tab->sequence,
                 'module_id' => $module->id,
             ]);
-            $block->save();
+            $tab->save();
 
-            // Create fields
-            foreach ($_block->fields as $_field) {
-                $field = new Field([
-                    'name' => $_field->name,
-                    'sequence' => $_field->sequence,
-                    'data' => $_field->data ?? null,
-                    'uitype_id' => uitype($_field->uitype)->id,
-                    'displaytype_id' => displaytype($_field->displaytype)->id,
-                    'block_id' => $block->id,
+            // Create blocks
+            foreach ($tab->blocks as $_block) {
+                $block = new Block([
+                    'label' => $_block->label,
+                    'icon' => $_block->icon,
+                    'sequence' => $_block->sequence,
+                    'tab_id' => $tab->id,
                     'module_id' => $module->id,
                 ]);
-                $field->save();
+                $block->save();
+
+                // Create fields
+                foreach ($_block->fields as $_field) {
+                    $field = new Field([
+                        'name' => $_field->name,
+                        'sequence' => $_field->sequence,
+                        'data' => $_field->data ?? null,
+                        'uitype_id' => uitype($_field->uitype)->id,
+                        'displaytype_id' => displaytype($_field->displaytype)->id,
+                        'block_id' => $block->id,
+                        'module_id' => $module->id,
+                    ]);
+                    $field->save();
+                }
             }
         }
 
@@ -749,10 +1077,12 @@ class MakeModuleCommand extends Command
     {
         $fields = [];
 
-        foreach ($this->module->blocks as $block) {
-            if (isset($block->fields)) {
-                foreach ($block->fields as $field) {
-                    $fields[] = $field;
+        foreach ($this->module->tabs as $tab) {
+            foreach ($tab->blocks as $block) {
+                if (isset($block->fields)) {
+                    foreach ($block->fields as $field) {
+                        $fields[] = $field;
+                    }
                 }
             }
         }
@@ -793,6 +1123,31 @@ class MakeModuleCommand extends Command
     }
 
     /**
+     * Ask user to select an existant tab
+     *
+     * @return \StdClass
+     */
+    protected function selectTab()
+    {
+        $tabs = $this->module->tabs;
+
+        $choices = [];
+
+        foreach($tabs as $tab) {
+            $choices[] = $tab->label;
+        }
+
+        // Sort by label
+        sort($choices);
+
+        $choice = $this->choice('Choose the tab', $choices, count($choices) - 1);
+
+        $index = array_search($choice, $choices);
+
+        return $tabs[$index];
+    }
+
+    /**
      * Ask user to select an existant block
      *
      * @return \StdClass
@@ -801,15 +1156,81 @@ class MakeModuleCommand extends Command
     {
         $choices = [];
 
-        foreach($this->module->blocks as $block) {
-            $choices[] = $block->label;
+        $allBlocks = [];
+
+        foreach ($this->module->tabs as $tab) {
+            foreach($tab->blocks as $block) {
+                $choices[] = $block->label;
+
+                $allBlocks[] = $block;
+            }
         }
 
         $choice = $this->choice('Choose the block in which to add the field', $choices, count($choices) - 1);
 
         $index = array_search($choice, $choices);
 
-        return $this->module->blocks[$index];
+        return $allBlocks[$index];
+    }
+
+    /**
+     * Ask user to select an existant field
+     *
+     * @param Module $module
+     * @return \StdClass
+     */
+    protected function selectField(Module $module)
+    {
+        $fields = $module->fields;
+
+        $choices = [];
+
+        foreach($fields as $field) {
+            $choices[] = $field->name;
+        }
+
+        // Sort by name
+        sort($choices);
+
+        $choice = $this->choice('Choose the field', $choices, count($choices) - 1);
+
+        $index = array_search($choice, $choices);
+
+        return $fields[$index];
+    }
+
+    /**
+     * Choose a module
+     *
+     * @param string $message
+     * @return string
+     */
+    protected function selectModule($message = null)
+    {
+        if (!$message) {
+            $message = 'Choose the module in which to perform the action';
+        }
+
+        $modules = Module::whereNotNull('model_class')->orderBy('name')->get();
+
+        $choices = [];
+        foreach ($modules as $_module) {
+            $choices[] = $_module->name;
+        }
+
+        // Add module itself if necessary
+        if (!in_array($this->module->name, $choices)) {
+            $choices[] = $this->module->name;
+        }
+
+        // Sort
+        sort($choices);
+
+        $choice = $this->choice($message, $choices);
+
+        $index = array_search($choice, $choices);
+
+        return $modules[$index];
     }
 
     /**
