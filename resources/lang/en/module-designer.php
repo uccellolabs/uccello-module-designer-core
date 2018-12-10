@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'module_designer' => 'Module Designer',
+    'module-designer' => 'Module Designer',
     'menu.settings' => 'Settings',
     'menu.install_module' => 'Install module',
     'menu.create_module' => 'Create module',
