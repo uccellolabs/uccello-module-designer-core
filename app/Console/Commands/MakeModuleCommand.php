@@ -9,7 +9,6 @@ use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
-use Illuminate\Support\Facades\Schema;
 use Uccello\Core\Models\Displaytype;
 use Uccello\Core\Support\ModuleImport;
 
@@ -259,17 +258,17 @@ class MakeModuleCommand extends Command
         $this->module->isForAdmin = $this->confirm('Is this module for administration panel?');
 
         // Link
-        $this->module->link = $this->ask('Main page name', 'list');
+        $this->module->route = $this->ask('Default route', 'uccello.list');
 
         //TODO: Ask for package name
 
         // Display module data
         $this->table(
             [
-                'Name', 'Model', 'Table', 'Prefix', 'Icon', 'For admin', 'Main page'
+                'Name', 'Model', 'Table', 'Prefix', 'Icon', 'For admin', 'Default route'
             ],
             [
-                [$this->module->name, $this->module->model, $this->module->tableName, $this->module->tablePrefix,  $this->module->icon, ($this->module->isForAdmin ? 'Yes' : 'No'), $this->module->link]
+                [$this->module->name, $this->module->model, $this->module->tableName, $this->module->tablePrefix,  $this->module->icon, ($this->module->isForAdmin ? 'Yes' : 'No'), $this->module->route]
             ]
         );
 
@@ -309,11 +308,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
-        if (strtoupper($icon) === 'NULL') {
-            $icon = null;
-        }
-        $tab->icon = $icon;
+        $tab->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
 
         // Sequence
         if (count($this->module->tabs) > 0) {
@@ -369,21 +364,25 @@ class MakeModuleCommand extends Command
         }
 
         $block = new \StdClass();
+        $block->data = new \StdClass();
         $block->fields = [];
 
         // Label
-        $defaultLabel = count($tab->blocks) === 0 ? 'block.general' : 'block.block' . count($tab->blocks);
-        $block->label = $this->ask('Block label (will be translated)', $defaultLabel);
+        $defaultLabel = count($tab->blocks) === 0 ? 'general' : 'block' . count($tab->blocks);
+        $label = $this->ask('Block label (will be translated)', $defaultLabel);
+        $block->label = 'block.' . $label;
 
         // Translation
         $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
 
-        // Icon
-        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
-        if (strtoupper($icon) === 'NULL') {
-            $icon = null;
+        // Description
+        if ($this->confirm('Do you want to add a description?')) {
+            $block->data->description = $block->label . '.description';
+            $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Translation [' . $this->locale . ']');
         }
-        $block->icon = $icon;
+
+        // Icon
+        $block->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
 
         // Sequence
         if (count($tab->blocks) > 0) {
@@ -472,6 +471,8 @@ class MakeModuleCommand extends Command
             $field->data->rules = "required";
         }
 
+        $field->displayInFilter = $this->confirm('Display this field by default in the list view?', true);
+
         // Large
         $large = $this->confirm('Display the field in two columns?', false);
         if ($large) {
@@ -547,11 +548,13 @@ class MakeModuleCommand extends Command
         }
 
         $relatedList = new \StdClass();
+        $relatedList->data = new \StdClass();
 
         // Label
         $relatedListIndex = count($this->module->relatedLists)+1;
-        $defaultLabel = 'relatedlist.' . 'relatedlist'.$relatedListIndex;
-        $relatedList->label = $this->ask('Choose a label (will be translated)', $defaultLabel);
+        $defaultLabel = 'relatedlist'.$relatedListIndex;
+        $label = $this->ask('Choose a label (will be translated)', $defaultLabel);
+        $relatedList->label = 'relatedlist.' . $label;
 
         // Translation
         $this->module->lang->{$this->locale}->{$relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
@@ -562,13 +565,14 @@ class MakeModuleCommand extends Command
 
         // Related Module
         $relatedModule = $this->selectModule('Select the related module');
+        $relatedList->related_module = $relatedModule->name;
 
         // Related field
         if ($relatedList->type === 'n-1') {
             $relatedField = $this->selectField($relatedModule);
-            $relatedList->related_field_id = $relatedField->id;
+            $relatedList->related_field = $relatedField->name;
         } else {
-            $relatedList->related_field_id = null;
+            $relatedList->related_field = null;
         }
 
         // Tab
@@ -582,7 +586,7 @@ class MakeModuleCommand extends Command
 
         // Method
         $defaultMethod = $relatedList->type === 'n-n' ? 'getRelatedList' : 'getDependentList';
-        $method = $this->ask('Choose a method', $defaultMethod);
+        $relatedList->method = $this->ask('Choose a method', $defaultMethod);
 
         // Actions
         if ($relatedList->type === 'n-1') {
@@ -599,14 +603,10 @@ class MakeModuleCommand extends Command
             ];
         }
         $actionsAnswer = $this->choice('Choose available actions', $actionsChoices, 'Nothing');
-        $relatedList->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
+        $relatedList->data->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
 
         // Icon
-        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
-        if (strtoupper($icon) === 'NULL') {
-            $icon = null;
-        }
-        $relatedList->icon = $icon;
+        $relatedList->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
 
         // Sequence
         if (count($this->module->relatedLists) > 0) {
@@ -620,7 +620,7 @@ class MakeModuleCommand extends Command
             $position = $this->choice('Where do you want to add this related list?', $choices, $choices[count($choices)-1]);
             $relatedListIndex = floor(array_search($position, $choices) / 2);
 
-            $relatedList->sequence = preg_match('`After`', $positionAnswer) ? $relatedListIndex + 1 : $relatedListIndex;
+            $relatedList->sequence = preg_match('`After`', $position) ? $relatedListIndex + 1 : $relatedListIndex;
 
         } else {
             $relatedList->sequence = 0;
@@ -662,18 +662,15 @@ class MakeModuleCommand extends Command
         $link->data = new \StdClass();
 
         // Label
-        $defaultLabel = 'link.link' . count($this->module->links);
-        $link->label = $this->ask('Link label (will be translated)', $defaultLabel);
+        $defaultLabel = 'link' . count($this->module->links);
+        $label = $this->ask('Link label (will be translated)', $defaultLabel);
+        $link->label = 'link.' . $label;
 
         // Translation
         $this->module->lang->{$this->locale}->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)', 'NULL');
-        if (strtoupper($icon) === 'NULL') {
-            $icon = null;
-        }
-        $link->icon = $icon;
+        $link->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
 
         // Type
         $link->type = $this->choice('Type of link', ['detail', 'detail.action'], 'detail');
@@ -866,6 +863,9 @@ class MakeModuleCommand extends Command
             $uitypes[] = $uitype->name;
         }
 
+        // Sort by name
+        sort($uitypes);
+
         return $uitypes;
     }
 
@@ -892,6 +892,11 @@ class MakeModuleCommand extends Command
      */
     protected function selectTab()
     {
+        if (empty($this->module->tabs)) {
+            $this->error('You must create a tab first');
+            $this->chooseAction(1);
+        }
+
         $tabs = $this->module->tabs;
 
         $choices = [];
@@ -900,12 +905,15 @@ class MakeModuleCommand extends Command
             $choices[] = $tab->label;
         }
 
+        // We clone the array before to sort it to retrieve the good choice index
+        $choices_orig = $choices;
+
         // Sort by label
         sort($choices);
 
         $choice = $this->choice('Choose the tab', $choices, count($choices) - 1);
 
-        $index = array_search($choice, $choices);
+        $index = array_search($choice, $choices_orig);
 
         return $tabs[$index];
     }
@@ -927,6 +935,11 @@ class MakeModuleCommand extends Command
 
                 $allBlocks[] = $block;
             }
+        }
+
+        if (empty($allBlocks)) {
+            $this->error('You must create a block first');
+            $this->chooseAction(2);
         }
 
         $choice = $this->choice('Choose the block in which to add the field', $choices, count($choices) - 1);
@@ -952,12 +965,15 @@ class MakeModuleCommand extends Command
             $choices[] = $field->name;
         }
 
+        // We clone the array before to sort it to retrieve the good choice index
+        $choices_orig = $choices;
+
         // Sort by name
         sort($choices);
 
         $choice = $this->choice('Choose the field', $choices, count($choices) - 1);
 
-        $index = array_search($choice, $choices);
+        $index = array_search($choice, $choices_orig);
 
         return $fields[$index];
     }
@@ -986,12 +1002,15 @@ class MakeModuleCommand extends Command
             $choices[] = $this->module->name;
         }
 
+        // We clone the array before to sort it to retrieve the good choice index
+        $choices_orig = $choices;
+
         // Sort
         sort($choices);
 
         $choice = $this->choice($message, $choices);
 
-        $index = array_search($choice, $choices);
+        $index = array_search($choice, $choices_orig);
 
         return $modules[$index];
     }
