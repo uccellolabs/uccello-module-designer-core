@@ -3,6 +3,7 @@
 namespace Uccello\ModuleDesigner\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Filesystem\Filesystem;
 use Uccello\ModuleDesigner\Models\DesignedModule;
 use Uccello\Core\Models\Uitype;
 use Uccello\Core\Models\Module;
@@ -29,6 +30,13 @@ class MakeModuleCommand extends Command
     protected $locale;
 
     /**
+     * File system implementation
+     *
+     * @var \Illuminate\Filesystem\Filesystem
+     */
+    protected $files;
+
+    /**
      * The name and signature of the console command.
      *
      * @var string
@@ -47,9 +55,11 @@ class MakeModuleCommand extends Command
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(FileSystem $files)
     {
         parent::__construct();
+
+        $this->files = $files;
 
         $this->locale = \Lang::getLocale();
     }
@@ -81,7 +91,8 @@ class MakeModuleCommand extends Command
             $choices = [];
             $modules = [];
 
-            $createEditModuleChoice = 'Create or edit another module';
+            // $createEditModuleChoice = 'Create or edit another module';
+            $createEditModuleChoice = 'Create a new module';
             $removeDesignedModuleChoice = 'Remove a designed module from the list';
 
             foreach ($designedModules as $module) {
@@ -106,7 +117,7 @@ class MakeModuleCommand extends Command
 
             // Create or Edit another module
             if ($choice === $createEditModuleChoice) {
-                $this->chooseAction(0, true);
+                $this->createModule();
             }
             // Remove designed module from the list
             elseif ($choice === $removeDesignedModuleChoice) {
@@ -161,6 +172,15 @@ class MakeModuleCommand extends Command
             unset($availableChoices[0]);
         }
 
+        if (empty($this->module)) {
+            unset($availableChoices[1]);
+            unset($availableChoices[2]);
+            unset($availableChoices[3]);
+            unset($availableChoices[4]);
+            unset($availableChoices[5]);
+            unset($availableChoices[6]);
+        }
+
         $choice = $this->choice('What action do you want to perform?', $availableChoices, $defaultChoiceIndex);
 
         switch ($choice) {
@@ -207,13 +227,26 @@ class MakeModuleCommand extends Command
     }
 
     /**
+     * Check module existence or notice the user
+     *
+     * @return void
+     */
+    protected function checkModuleExistence()
+    {
+        if (empty($this->module)) {
+            $this->error('You must create a module first');
+            $this->chooseAction(0, true);
+        }
+    }
+
+    /**
      * Ask the user information to make the skeleton of the module.
      *
      * @return void
      */
     protected function createModule()
     {
-        $moduleName = $this->ask('<info>What is the module name? (e.g. book_type)</info>');
+        $moduleName = $this->ask('What is the module name? (e.g. book-type)');
 
         // The snake_case function converts the given string to snake_case
         $moduleName = snake_case($moduleName);
@@ -224,8 +257,8 @@ class MakeModuleCommand extends Command
             return $this->createModule();
         }
         // Check if module name is only with alphanumeric characters
-        elseif (!preg_match('`^[a-z0-9_]+$`', $moduleName)) {
-            $this->error('You must use only alphanumeric characters');
+        elseif (!preg_match('`^[a-z0-9-]+$`', $moduleName)) {
+            $this->error('You must use only alphanumeric characters in lowercase');
             return $this->createModule();
         }
 
@@ -235,7 +268,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale} = new \StdClass();
 
         // Name
-        $this->module->name = snake_case($moduleName);
+        $this->module->name = kebab_case($moduleName);
 
         // Translation
         $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural [' . $this->locale . ']');
@@ -245,30 +278,66 @@ class MakeModuleCommand extends Command
         $defaultModelClass = 'App\\' . studly_case($moduleName); // The studly_case function converts the given string to StudlyCase
         $this->module->model = $this->ask('Model class', $defaultModelClass);
 
+        // Package
+        $this->module->package = null;
+
+        // If the model class does not begin by App\, ask the user if he wants to create the module in an external package
+        $modelClassParts = explode('\\', $this->module->model);
+        if ($modelClassParts[0] !== 'App') {
+            if ($this->confirm('Do you want to create this module in an external package?', true)) {
+                // Select an external package
+                $package = $this->selectPackage();
+                if (!is_null($package)) {
+                    $this->module->package = $package;
+                }
+            }
+        }
+
         // Table name
         $this->module->tableName = $this->ask('Table name', str_plural($this->module->name));
 
         // Table prefix
-        $this->module->tablePrefix = $this->ask('Table prefix');
+        if (!empty($this->module->package)) {
+            $packageParts = explode('/', $this->module->package);
+            $packageName = array_pop($packageParts);
+            $defaultPrefix = $packageName . '_';
+        } else {
+            $defaultPrefix = '';
+        }
+        $this->module->tablePrefix = $this->ask('Table prefix', $defaultPrefix);
 
         // Icon
-        $this->module->icon = $this->ask('Material icon name (e.g. book)');
+        $this->module->icon = $this->ask('Material <comment>icon</comment> name (e.g. book)');
 
         // Is for administration
-        $this->module->isForAdmin = $this->confirm('Is this module for administration panel?');
+        $this->module->isForAdmin = $this->confirm('Is this module for <comment>administration</comment> panel?');
 
         // Link
         $this->module->route = $this->ask('Default route', 'uccello.list');
 
-        //TODO: Ask for package name
-
         // Display module data
         $this->table(
             [
-                'Name', 'Model', 'Table', 'Prefix', 'Icon', 'For admin', 'Default route'
+                'Name',
+                'Package',
+                'Model',
+                'Table',
+                'Prefix',
+                'Icon',
+                'For admin',
+                'Default route'
             ],
             [
-                [$this->module->name, $this->module->model, $this->module->tableName, $this->module->tablePrefix,  $this->module->icon, ($this->module->isForAdmin ? 'Yes' : 'No'), $this->module->route]
+                [
+                    $this->module->name,
+                    $this->module->package,
+                    $this->module->model,
+                    $this->module->tableName,
+                    $this->module->tablePrefix,
+                    $this->module->icon,
+                    ($this->module->isForAdmin ? 'Yes' : 'No'),
+                    $this->module->route
+                ]
             ]
         );
 
@@ -292,6 +361,9 @@ class MakeModuleCommand extends Command
      */
     protected function createTab()
     {
+        // Check module existence
+        $this->checkModuleExistence();
+
         // Initialize tabs list if necessary
         if (!isset($this->module->tabs)) {
             $this->module->tabs = [];
@@ -308,7 +380,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $tab->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
+        $tab->icon = $this->ask('Icon CSS class name');
 
         // Sequence
         if (count($this->module->tabs) > 0) {
@@ -355,6 +427,9 @@ class MakeModuleCommand extends Command
      */
     protected function createBlock()
     {
+        // Check module existence
+        $this->checkModuleExistence();
+
         // Select a tab
         $tab = $this->selectTab();
 
@@ -376,13 +451,13 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Description
-        if ($this->confirm('Do you want to add a description?')) {
+        if ($this->confirm('Do you want to add a <comment>description</comment>?')) {
             $block->data->description = $block->label . '.description';
             $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Translation [' . $this->locale . ']');
         }
 
         // Icon
-        $block->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
+        $block->icon = $this->ask('Icon CSS class name');
 
         // Sequence
         if (count($tab->blocks) > 0) {
@@ -429,6 +504,9 @@ class MakeModuleCommand extends Command
      */
     protected function createField()
     {
+        // Check module existence
+        $this->checkModuleExistence();
+
         // Get all module fields
         $moduleFields = $this->getAllFields();
 
@@ -543,6 +621,9 @@ class MakeModuleCommand extends Command
      */
     protected function createRelatedList()
     {
+        // Check module existence
+        $this->checkModuleExistence();
+
         if (!isset($this->module->relatedLists)) {
             $this->module->relatedLists = [];
         }
@@ -606,7 +687,7 @@ class MakeModuleCommand extends Command
         $relatedList->data->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
 
         // Icon
-        $relatedList->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
+        $relatedList->icon = $this->ask('Icon CSS class name');
 
         // Sequence
         if (count($this->module->relatedLists) > 0) {
@@ -653,6 +734,9 @@ class MakeModuleCommand extends Command
      */
     protected function createLink()
     {
+        // Check module existence
+        $this->checkModuleExistence();
+
         // Initialize links list if necessary
         if (!isset($this->module->links)) {
             $this->module->links = [];
@@ -670,7 +754,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $link->icon = $this->ask('Icon CSS class name (type <comment>NULL</comment> for not define it)');
+        $link->icon = $this->ask('Icon CSS class name');
 
         // Type
         $link->type = $this->choice('Type of link', ['detail', 'detail.action'], 'detail');
@@ -811,7 +895,10 @@ class MakeModuleCommand extends Command
      */
     public function installModule()
     {
-        $import = new ModuleImport();
+        // Check module existence
+        $this->checkModuleExistence();
+
+        $import = new ModuleImport($this->files);
         $import->install($this->module);
     }
 
@@ -919,6 +1006,29 @@ class MakeModuleCommand extends Command
     }
 
     /**
+     * Ask the user the package in which he wants to create the new module
+     *
+     * @return string
+     */
+    protected function selectPackage()
+    {
+        $package = null;
+
+        // Get all packages
+        $choices = $this->getPackages();
+
+        if (count($choices) > 0) {
+            $choice = $this->choice('In which package do you want to create the module?', $choices);
+
+            $index = array_search($choice, $choices);
+
+            $package = $choices[$index];
+        }
+
+        return $package;
+    }
+
+    /**
      * Ask user to select an existant block
      *
      * @return \StdClass
@@ -979,7 +1089,7 @@ class MakeModuleCommand extends Command
     }
 
     /**
-     * Choose a module
+     * Ask the user to select a module
      *
      * @param string $message
      * @return string
@@ -1028,5 +1138,36 @@ class MakeModuleCommand extends Command
         }
 
         return ($a->sequence < $b->sequence) ? -1 : 1;
+    }
+
+    /**
+     * Scans packages directory and returns the packages list with the following format: vendor/package
+     *
+     * @return array
+     */
+    protected function getPackages() {
+        $packages = [];
+
+        // Get packages list from
+        $packagePath = base_path('packages');
+
+        if (is_dir($packagePath)) {
+            // First level directories are vendors
+            $vendors = $this->files->directories($packagePath);
+
+            foreach ($vendors as $vendor) {
+                // Second level directories are packages
+                $vendorPackages = $this->files->directories($vendor);
+
+                foreach ($vendorPackages as $vendorPackage) {
+                    $packages[] = $this->files->basename($vendor) . '/' . $this->files->basename($vendorPackage);
+                }
+            }
+        }
+
+        // Sort packages by name
+        sort($packages);
+
+        return $packages;
     }
 }
