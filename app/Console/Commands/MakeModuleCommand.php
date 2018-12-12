@@ -307,10 +307,10 @@ class MakeModuleCommand extends Command
         $this->module->tablePrefix = $this->ask('Table prefix', $defaultPrefix);
 
         // Icon
-        $this->module->icon = $this->ask('Material <comment>icon</comment> name (e.g. book)');
+        $this->module->icon = $this->ask('Material icon name (e.g. book)');
 
         // Is for administration
-        $this->module->isForAdmin = $this->confirm('Is this module for <comment>administration</comment> panel?');
+        $this->module->isForAdmin = $this->confirm('Is this module for administration panel?');
 
         // Link
         $this->module->route = $this->ask('Default route', 'uccello.list');
@@ -451,7 +451,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Description
-        if ($this->confirm('Do you want to add a <comment>description</comment>?')) {
+        if ($this->confirm('Do you want to add a description?')) {
             $block->data->description = $block->label . '.description';
             $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Translation [' . $this->locale . ']');
         }
