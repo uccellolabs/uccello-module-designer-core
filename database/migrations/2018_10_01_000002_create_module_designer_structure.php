@@ -36,7 +36,7 @@ class CreateModuleDesignerStructure extends Migration
         $module->name = 'module-designer';
         $module->icon = 'brush';
         $module->model_class = null;
-        $module->data = ["package" => "module-designer", "admin" => true, "route" => "uccello.index"];
+        $module->data = ["package" => "uccello/module-designer", "admin" => true, "route" => "uccello.index"];
         $module->save();
 
         return $module;
