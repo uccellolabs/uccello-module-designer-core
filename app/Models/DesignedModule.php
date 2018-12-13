@@ -28,7 +28,8 @@ class DesignedModule extends Model
      * @var array
      */
     protected $fillable = [
-        'name', 'data',
+        'name',
+        'data',
     ];
 
     protected function setTablePrefix()

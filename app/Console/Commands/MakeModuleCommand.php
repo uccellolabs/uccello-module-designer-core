@@ -12,6 +12,7 @@ use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Displaytype;
 use Uccello\Core\Support\ModuleImport;
+use Uccello\Core\Support\ModuleExport;
 
 class MakeModuleCommand extends Command
 {
@@ -86,63 +87,95 @@ class MakeModuleCommand extends Command
         // Get all designed modules
         $designedModules = DesignedModule::all();
 
-        // If designed modules are found display several options
+
+        $choices = [];
+        $modules = [];
+
+        // $createEditModuleChoice = 'Create or edit another module';
+        $createModuleChoice = 'Create a new module';
+        $editModuleChoice = 'Edit a module';
+        $removeDesignedModuleChoice = count($designedModules) > 0 ? 'Remove a designed module from the list' : null;
+
+        foreach ($designedModules as $module) {
+            // Get module name
+            $name = $module->name;
+
+            // Store module data
+            $modules[$name] = is_object($module->data) ? $module->data : json_decode($module->data); // It seems to be not converted automaticaly
+
+            // Add module name to choices list
+            $choices[] = $name;
+        }
+
+        // Add actions to choices list
+        $availableChoices = array_merge($choices, [
+            $createModuleChoice,
+            $editModuleChoice
+        ]);
+
+        // If designed modules are found display other options
         if (count($designedModules) > 0) {
-            $choices = [];
-            $modules = [];
+            $availableChoices[] = $removeDesignedModuleChoice;
+            $message = 'Some modules are being designed. Choose a module to continue or select an action to perform';
+        } else {
+            $message = 'Select an action to perform';
+        }
 
-            // $createEditModuleChoice = 'Create or edit another module';
-            $createEditModuleChoice = 'Create a new module';
-            $removeDesignedModuleChoice = 'Remove a designed module from the list';
+        // Ask the action to perform
+        $choice = $this->choice($message, $availableChoices);
 
-            foreach ($designedModules as $module) {
-                // Get module name
-                $name = $module->name;
+        // Create a new module
+        if ($choice === $createModuleChoice) {
+            $this->createModule();
+            return;
+        }
+        // Edit a module
+        elseif ($choice === $editModuleChoice) {
+            $module = $this->selectModule('Select the module you want to edit');
 
-                // Store module data
-                $modules[$name] = $module->data;
+            $import = new ModuleExport($this->files, $this);
+            $this->module = $import->getStructure($module);
 
-                // Add module name to choices list
-                $choices[] = $name;
-            }
-
-            // Add actions to choices list
-            $availableChoices = array_merge($choices, [
-                $createEditModuleChoice,
-                $removeDesignedModuleChoice
-            ]);
-
-            // Ask the action to perform
-            $choice = $this->choice('Some modules are being designed. Choose a module to continue or select an action to perform', $availableChoices);
-
-            // Create or Edit another module
-            if ($choice === $createEditModuleChoice) {
-                $this->createModule();
-            }
-            // Remove designed module from the list
-            elseif ($choice === $removeDesignedModuleChoice) {
-                // Ask the user what designed module he wants to remove
-                $designedModuleToDelete = $this->choice('What designed module do you want to remove from the list?', $choices);
-
-                // Delete designed module
-                DesignedModule::where('name', $designedModuleToDelete)->delete();
-                $this->info('<comment>' . $designedModuleToDelete . '</comment> was deleted from the list');
+            // Show an error if the module is already being edited
+            if (DesignedModule::where('name', $module->name)->first() !== null) {
+                $this->error('You have already started to edit this module');
 
                 // Display the list again
                 $this->checkForDesignedModules();
+                return;
             }
-            // Select module and continue
-            else {
-                $this->module = $modules[$choice];
-                $this->line('<info>Selected module:</info> '.$choice);
 
-                // Continue
-                $this->chooseAction(1);
-            }
+            $designedModule = new DesignedModule([
+                'name' => $module->name,
+                'data' => $import->getJson($module)
+            ]);
+            $designedModule->save();
+
+            // Continue
+            $this->chooseAction(1);
+            return;
         }
-        // No designed module available, simply continue
+        // Remove designed module from the list
+        elseif ($choice === $removeDesignedModuleChoice) {
+            // Ask the user what designed module he wants to remove
+            $designedModuleToDelete = $this->choice('What designed module do you want to remove from the list?', $choices);
+
+            // Delete designed module
+            DesignedModule::where('name', $designedModuleToDelete)->delete();
+            $this->info('<comment>' . $designedModuleToDelete . '</comment> was deleted from the list');
+
+            // Display the list again
+            $this->checkForDesignedModules();
+            return;
+        }
+        // Select module and continue
         else {
-            $this->chooseAction(0, true);
+            $this->module = $modules[$choice];
+            $this->line('<info>Selected module:</info> '.$choice);
+
+            // Continue
+            $this->chooseAction(1);
+            return;
         }
     }
 
@@ -162,8 +195,10 @@ class MakeModuleCommand extends Command
             'Add a field',
             'Add a related list',
             'Add a link',
+            'Delete an element',
             'Install module',
             'Exit'
+            //TODO: Make a migration file
         ];
 
         // Remove first choice if necessary
@@ -172,6 +207,7 @@ class MakeModuleCommand extends Command
             unset($availableChoices[0]);
         }
 
+        // Remove other choices if module does not exist
         if (empty($this->module)) {
             unset($availableChoices[1]);
             unset($availableChoices[2]);
@@ -179,6 +215,7 @@ class MakeModuleCommand extends Command
             unset($availableChoices[4]);
             unset($availableChoices[5]);
             unset($availableChoices[6]);
+            unset($availableChoices[7]);
         }
 
         $choice = $this->choice('What action do you want to perform?', $availableChoices, $defaultChoiceIndex);
@@ -216,11 +253,16 @@ class MakeModuleCommand extends Command
 
             // Install module
             case $choices[6]:
+                $this->deleteElement();
+                break;
+
+            // Install module
+            case $choices[7]:
                 $this->installModule();
                 break;
 
             // Exit
-            case $choices[7]:
+            case $choices[8]:
                 // Do nothing
                 break;
         }
@@ -236,6 +278,7 @@ class MakeModuleCommand extends Command
         if (empty($this->module)) {
             $this->error('You must create a module first');
             $this->chooseAction(0, true);
+            return;
         }
     }
 
@@ -254,16 +297,19 @@ class MakeModuleCommand extends Command
         // If module name is not defined, ask again
         if (!$moduleName) {
             $this->error('You must specify a module name');
-            return $this->createModule();
+            $this->createModule();
+            return;
         }
         // Check if module name is only with alphanumeric characters
         elseif (!preg_match('`^[a-z0-9-]+$`', $moduleName)) {
             $this->error('You must use only alphanumeric characters in lowercase');
-            return $this->createModule();
+            $this->createModule();
+            return;
         }
 
         // Create an empty object
-        $this->module = new \stdClass();
+        $this->module = new \StdClass();
+        $this->module->data = new \StdClass();
         $this->module->lang = new \StdClass();
         $this->module->lang->{$this->locale} = new \StdClass();
 
@@ -279,7 +325,7 @@ class MakeModuleCommand extends Command
         $this->module->model = $this->ask('Model class', $defaultModelClass);
 
         // Package
-        $this->module->package = null;
+        $package = null;
 
         // If the model class does not begin by App\, ask the user if he wants to create the module in an external package
         $modelClassParts = explode('\\', $this->module->model);
@@ -288,7 +334,7 @@ class MakeModuleCommand extends Command
                 // Select an external package
                 $package = $this->selectPackage();
                 if (!is_null($package)) {
-                    $this->module->package = $package;
+                    $this->module->data->package = $package;
                 }
             }
         }
@@ -297,8 +343,8 @@ class MakeModuleCommand extends Command
         $this->module->tableName = $this->ask('Table name', str_plural($this->module->name));
 
         // Table prefix
-        if (!empty($this->module->package)) {
-            $packageParts = explode('/', $this->module->package);
+        if (!empty($this->module->data->package)) {
+            $packageParts = explode('/', $this->module->data->package);
             $packageName = array_pop($packageParts);
             $defaultPrefix = $packageName . '_';
         } else {
@@ -310,10 +356,16 @@ class MakeModuleCommand extends Command
         $this->module->icon = $this->ask('Material icon name (e.g. book)');
 
         // Is for administration
-        $this->module->isForAdmin = $this->confirm('Is this module for administration panel?');
+        $isForAdmin = $this->confirm('Is this module for administration panel?');
+        if ($isForAdmin) {
+            $this->module->data->admin = true;
+        }
 
         // Link
-        $this->module->route = $this->ask('Default route', 'uccello.list');
+        $defaultRoute = $this->ask('Default route', 'uccello.list');
+        if ($defaultRoute !== 'uccello.list') {
+            $this->module->data->route = $defaultRoute;
+        }
 
         // Display module data
         $this->table(
@@ -330,13 +382,13 @@ class MakeModuleCommand extends Command
             [
                 [
                     $this->module->name,
-                    $this->module->package,
+                    $package,
                     $this->module->model,
                     $this->module->tableName,
                     $this->module->tablePrefix,
                     $this->module->icon,
-                    ($this->module->isForAdmin ? 'Yes' : 'No'),
-                    $this->module->route
+                    ($isForAdmin ? 'Yes' : 'No'),
+                    $defaultRoute
                 ]
             ]
         );
@@ -370,6 +422,7 @@ class MakeModuleCommand extends Command
         }
 
         $tab = new \StdClass();
+        $tab->id = null;
         $tab->blocks = [];
 
         // Label
@@ -439,6 +492,7 @@ class MakeModuleCommand extends Command
         }
 
         $block = new \StdClass();
+        $block->id = null;
         $block->data = new \StdClass();
         $block->fields = [];
 
@@ -511,7 +565,7 @@ class MakeModuleCommand extends Command
         $moduleFields = $this->getAllFields();
 
         // Select a block
-        $block = $this->selectBlock();
+        $block = $this->selectBlock('Choose the block in which to add the field');
 
         // Initialize fields list if necessary
         if (!isset($block->fields)) {
@@ -519,6 +573,7 @@ class MakeModuleCommand extends Command
         }
 
         $field = new \StdClass();
+        $field->id = null;
         $field->data = new \StdClass();
 
         // Name
@@ -528,7 +583,7 @@ class MakeModuleCommand extends Command
         // Check if the name already exists
         foreach ($moduleFields as $moduleField) {
             if ($moduleField->name === $field->name) {
-                $this->error("A field called $field->name already exists.");
+                $this->error("A field called $field->name already exists");
                 $this->chooseAction();
                 return;
             }
@@ -629,6 +684,7 @@ class MakeModuleCommand extends Command
         }
 
         $relatedList = new \StdClass();
+        $relatedList->id = null;
         $relatedList->data = new \StdClass();
 
         // Label
@@ -743,6 +799,7 @@ class MakeModuleCommand extends Command
         }
 
         $link = new \StdClass();
+        $link->id = null;
         $link->data = new \StdClass();
 
         // Label
@@ -888,17 +945,136 @@ class MakeModuleCommand extends Command
         $this->chooseAction(5);
     }
 
+    protected function deleteElement()
+    {
+        $choices = [
+            'Tab',
+            'Block',
+            'Field',
+            'Related list',
+            'Link'
+        ];
+
+        $choice = $this->choice('What type of element do you want to delete?', $choices);
+
+        switch ($choice) {
+            // Tab
+            case $choices[0]:
+                    $tab = $this->selectTab('Select the tab you want to delete. <error>WARNING: It will delete also all its blocks and fields!</error>', false);
+
+                    // Delete tab
+                    foreach ($this->module->tabs as $i => $_tab) {
+                        if ($tab->label === $_tab->label) {
+                            // Delete translation
+                            $this->deleteTranslation($_tab->label);
+
+                            // Delete blocks translations
+                            foreach ($_tab->blocks as $_block) {
+                                $this->deleteTranslation($_block->label);
+
+                                // Delete fields translations
+                                foreach ($_block->fields as $_field) {
+                                    $this->deleteTranslation('field.' . $_field->name);
+                                }
+                            }
+
+                            // Delete tab
+                            unset($this->module->tabs[$i]);
+                            break;
+                        }
+                    }
+                break;
+
+            // Block
+            case $choices[1]:
+                    $block = $this->selectBlock('Select the block you want to delete. <error>WARNING: It will delete also all its fields!</error>', false);
+
+                    // Delete block
+                    foreach ($this->module->tabs as $i => $_tab) {
+                        foreach ($_tab->blocks as $j => $_block) {
+                            if ($block->label === $_block->label) {
+                                // Delete translation
+                                $this->deleteTranslation($_block->label);
+
+                                // Delete fields translations
+                                foreach ($_block->fields as $_field) {
+                                    $this->deleteTranslation('field.' . $_field->name);
+                                }
+
+                                // Delete block
+                                unset($this->module->tabs[$i]->blocks[$j]);
+                                break;
+                            }
+                        }
+                    }
+                break;
+
+            // Field
+            case $choices[2]:
+                    $field = $this->selectField(null, 'Select the field you want to delete.', false);
+
+                    // Delete field
+                    foreach ($this->module->tabs as $i => $_tab) {
+                        foreach ($_tab->blocks as $j => $_block) {
+                            foreach ($_block->fields as $k => $_field) {
+                                if ($field->name === $_field->name) {
+                                    // Delete translation
+                                    $this->deleteTranslation('field.' . $_field->name);
+
+                                    // Delete field
+                                    unset($this->module->tabs[$i]->blocks[$j]->fields[$k]);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                break;
+
+            // Related list
+            case $choices[3]:
+                    $relatedlist = $this->selectRelatedList('Select the related list you want to delete.', false);
+
+                    // Delete related list
+                    foreach ($this->module->relatedlists as $i => $_relatedlist) {
+                        if ($relatedlist->label === $_relatedlist->label) {
+                            unset($this->module->relatedlists[$i]);
+                            break;
+                        }
+                    }
+                break;
+
+            // Link
+            case $choices[4]:
+                    $link = $this->selectLink('Select the link you want to delete.', false);
+
+                    // Delete link
+                    foreach ($this->module->links as $i => $_link) {
+                        if ($link->label === $_link->label) {
+                            unset($this->module->links[$i]);
+                            break;
+                        }
+                    }
+                break;
+        }
+
+        // Save module structure
+        $this->saveModuleStructure();
+
+        // Ask the user to choose another action
+        $this->chooseAction();
+    }
+
     /**
      * Install module
      *
      * @return void
      */
-    public function installModule()
+    protected function installModule()
     {
         // Check module existence
         $this->checkModuleExistence();
 
-        $import = new ModuleImport($this->files);
+        $import = new ModuleImport($this->files, $this);
         $import->install($this->module);
     }
 
@@ -924,11 +1100,15 @@ class MakeModuleCommand extends Command
     {
         $fields = [];
 
-        foreach ($this->module->tabs as $tab) {
-            foreach ($tab->blocks as $block) {
-                if (isset($block->fields)) {
-                    foreach ($block->fields as $field) {
-                        $fields[] = $field;
+        if (!empty($this->module->tabs)) {
+            foreach ($this->module->tabs as $tab) {
+                if (!empty($tab->blocks)) {
+                    foreach ($tab->blocks as $block) {
+                        if (!empty($block->fields)) {
+                            foreach ($block->fields as $field) {
+                                $fields[] = $field;
+                            }
+                        }
                     }
                 }
             }
@@ -973,39 +1153,6 @@ class MakeModuleCommand extends Command
     }
 
     /**
-     * Ask user to select an existant tab
-     *
-     * @return \StdClass
-     */
-    protected function selectTab()
-    {
-        if (empty($this->module->tabs)) {
-            $this->error('You must create a tab first');
-            $this->chooseAction(1);
-        }
-
-        $tabs = $this->module->tabs;
-
-        $choices = [];
-
-        foreach($tabs as $tab) {
-            $choices[] = $tab->label;
-        }
-
-        // We clone the array before to sort it to retrieve the good choice index
-        $choices_orig = $choices;
-
-        // Sort by label
-        sort($choices);
-
-        $choice = $this->choice('Choose the tab', $choices, count($choices) - 1);
-
-        $index = array_search($choice, $choices_orig);
-
-        return $tabs[$index];
-    }
-
-    /**
      * Ask the user the package in which he wants to create the new module
      *
      * @return string
@@ -1029,30 +1176,67 @@ class MakeModuleCommand extends Command
     }
 
     /**
-     * Ask user to select an existant block
+     * Ask user to select an existant tab
      *
+     * @param string|null $message
+     * @param boolean $autoSelect
      * @return \StdClass
      */
-    protected function selectBlock()
+    protected function selectTab($message = null, $autoSelect = true)
     {
+        if (empty($this->module->tabs)) {
+            $this->error('You must create a tab first');
+            $this->chooseAction(1);
+            return;
+        }
+
+        if (empty($message)) {
+            $message = 'Choose the tab';
+        }
+
+        $tabs = $this->module->tabs;
+
+        return $this->selectFromList($tabs, 'label', $message, $autoSelect);
+    }
+
+    /**
+     * Ask user to select an existant block
+     *
+     * @param string|null $message
+     * @param boolean $autoSelect
+     * @return \StdClass
+     */
+    protected function selectBlock($message = null, $autoSelect = true)
+    {
+        if (!$message) {
+            $message = 'Choose the block';
+        }
+
         $choices = [];
 
         $allBlocks = [];
 
-        foreach ($this->module->tabs as $tab) {
-            foreach($tab->blocks as $block) {
-                $choices[] = $block->label;
+        if (!empty($this->module->tabs)) {
+            foreach ($this->module->tabs as $tab) {
+                if (!empty($tab->blocks)) {
+                    foreach($tab->blocks as $block) {
+                        $choices[] = $block->label;
 
-                $allBlocks[] = $block;
+                        $allBlocks[] = $block;
+                    }
+                }
             }
         }
 
         if (empty($allBlocks)) {
             $this->error('You must create a block first');
             $this->chooseAction(2);
+            return;
         }
 
-        $choice = $this->choice('Choose the block in which to add the field', $choices, count($choices) - 1);
+        $defaultChoice = $autoSelect ? count($choices) - 1 : null;
+
+        $choice = $this->choice($message, $choices, $defaultChoice);
 
         $index = array_search($choice, $choices);
 
@@ -1062,30 +1246,30 @@ class MakeModuleCommand extends Command
     /**
      * Ask user to select an existant field
      *
-     * @param Module $module
+     * @param \Uccello\Core\Models\Module|null $module
+     * @param string|null $message
+     * @param boolean $autoSelect
      * @return \StdClass
      */
-    protected function selectField(Module $module)
+    protected function selectField(?Module $module, $message = null, $autoSelect = true)
     {
-        $fields = $module->fields;
-
-        $choices = [];
-
-        foreach($fields as $field) {
-            $choices[] = $field->name;
+        if (empty($message)) {
+            $message = 'Choose the field';
         }
 
-        // We clone the array before to sort it to retrieve the good choice index
-        $choices_orig = $choices;
+        if (!empty($module)) {
+            $fields = $module->fields;
+        } else {
+            $fields = $this->getAllFields();
+        }
 
-        // Sort by name
-        sort($choices);
+        if (empty($fields)) {
+            $this->error('No field available');
+            $this->chooseAction();
+            return;
+        }
 
-        $choice = $this->choice('Choose the field', $choices, count($choices) - 1);
-
-        $index = array_search($choice, $choices_orig);
-
-        return $fields[$index];
+        return $this->selectFromList($fields, 'name', $message, $autoSelect);
     }
 
     /**
@@ -1108,7 +1292,7 @@ class MakeModuleCommand extends Command
         }
 
         // Add module itself if necessary
-        if (!in_array($this->module->name, $choices)) {
+        if (!is_null($this->module) && !in_array($this->module->name, $choices)) {
             $choices[] = $this->module->name;
         }
 
@@ -1123,6 +1307,90 @@ class MakeModuleCommand extends Command
         $index = array_search($choice, $choices_orig);
 
         return $modules[$index];
+    }
+
+    /**
+     * Ask user to select an existant related list
+     *
+     * @param string|null $message
+     * @param boolean $autoSelect
+     * @return \StdClass
+     */
+    protected function selectRelatedList($message = null, $autoSelect = true)
+    {
+        if (empty($message)) {
+            $message = 'Choose the related list';
+        }
+
+        $relatedlists = $this->module->relatedlists;
+
+        if (empty($relatedlists)) {
+            $this->error('No related list available');
+            $this->chooseAction();
+            return;
+        }
+
+        return $this->selectFromList($relatedlists, 'label', $message, $autoSelect);
+    }
+
+    /**
+     * Ask user to select an existant link
+     *
+     * @param string|null $message
+     * @param boolean $autoSelect
+     * @return \StdClass
+     */
+    protected function selectLink($message = null, $autoSelect = true)
+    {
+        if (empty($message)) {
+            $message = 'Choose the link';
+        }
+
+        $links = $this->module->links;
+
+        if (empty($links)) {
+            $this->error('No link available');
+            $this->chooseAction();
+            return;
+        }
+
+        return $this->selectFromList($links, 'label', $message, $autoSelect);
+    }
+
+    /**
+     * Select item from a list
+     *
+     * @param array $list
+     * @param string $attribute
+     * @param string|null $message
+     * @param boolean $autoSelect
+     * @return mixed
+     */
+    protected function selectFromList(array $list, string $attribute, string $message = null, bool $autoSelect = false)
+    {
+        if (empty($list)) {
+            return null;
+        }
+
+        $choices = [];
+
+        foreach($list as $item) {
+            $choices[] = $item->{$attribute};
+        }
+
+        // We clone the array before to sort it to retrieve the good choice index
+        $choices_orig = $choices;
+
+        // Sort by label
+        sort($choices);
+
+        $defaultChoice = $autoSelect ? count($choices) - 1 : null;
+
+        $choice = $this->choice($message, $choices, $defaultChoice);
+
+        $index = array_search($choice, $choices_orig);
+
+        return $list[$index];
     }
 
     /**
@@ -1169,5 +1437,24 @@ class MakeModuleCommand extends Command
         sort($packages);
 
         return $packages;
+    }
+
+    /**
+     * Delete translation from module structure
+     *
+     * @param string $label
+     * @return void
+     */
+    protected function deleteTranslation($label)
+    {
+        $locale = $this->locale;
+
+        unset($this->module->lang->{$locale}->{$label});
+
+        if (empty($this->module->translationsToRemove)) {
+            $this->module->translationsToRemove = [];
+        }
+
+        $this->module->translationsToRemove[] = $label;
     }
 }
