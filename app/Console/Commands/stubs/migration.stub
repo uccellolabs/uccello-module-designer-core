@@ -1,0 +1,85 @@
+<?php
+
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Uccello\Core\Database\Migrations\Migration;
+use Uccello\Core\Models\Module;
+use Uccello\Core\Models\Domain;
+use Uccello\Core\Models\Tab;
+use Uccello\Core\Models\Block;
+use Uccello\Core\Models\Field;
+use Uccello\Core\Models\Filter;
+use Uccello\Core\Models\RelatedList;
+use Uccello\Core\Models\Link;
+
+class ClassName extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        $this->createTable();
+        $module = $this->createModule();
+        $this->activateModuleOnDomains($module);
+        $this->createTabsBlocksFields($module);
+        $this->createFilters($module);
+        $this->createRelatedLists($module);
+        $this->createLinks($module);
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        // Drop table
+        Schema::dropIfExists($this->tablePrefix . '%table_name%');
+
+        // Delete module
+        Module::where('name', '%module_name%')->forceDelete();
+    }
+
+    protected function createTable()
+    {
+        Schema::create($this->tablePrefix . '%table_name%', function (Blueprint $table) {
+            $table->increments('id');
+// %table_fields%
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    protected function createModule()
+    {
+        $module = new Module([
+// %module_fields%
+        ]);
+        $module->save();
+        return $module;
+    }
+
+    protected function activateModuleOnDomains($module)
+    {
+        $domains = Domain::all();
+        foreach ($domains as $domain) {
+            $domain->modules()->attach($module);
+        }
+    }
+
+    protected function createTabsBlocksFields($module)
+    {// %tabs_blocks_fields}
+
+    protected function createFilters($module)
+    {// %filters%}
+
+    protected function createRelatedLists($module)
+    {// %relatedlists%}
+
+    protected function createLinks($module)
+    {// %links%}
+}

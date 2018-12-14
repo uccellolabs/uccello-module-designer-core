@@ -16,6 +16,8 @@ use Uccello\Core\Support\ModuleExport;
 
 class MakeModuleCommand extends Command
 {
+    //TODO: Search how imags do not work in detail view
+
     /**
      * The structure of the module.
      *
@@ -91,7 +93,6 @@ class MakeModuleCommand extends Command
         $choices = [];
         $modules = [];
 
-        // $createEditModuleChoice = 'Create or edit another module';
         $createModuleChoice = 'Create a new module';
         $editModuleChoice = 'Edit a module';
         $removeDesignedModuleChoice = count($designedModules) > 0 ? 'Remove a designed module from the list' : null;
@@ -101,7 +102,7 @@ class MakeModuleCommand extends Command
             $name = $module->name;
 
             // Store module data
-            $modules[$name] = is_object($module->data) ? $module->data : json_decode($module->data); // It seems to be not converted automaticaly
+            $modules[$name] = $module->data;
 
             // Add module name to choices list
             $choices[] = $name;
@@ -147,7 +148,7 @@ class MakeModuleCommand extends Command
 
             $designedModule = new DesignedModule([
                 'name' => $module->name,
-                'data' => $import->getJson($module)
+                'data' => $this->module
             ]);
             $designedModule->save();
 
@@ -197,8 +198,8 @@ class MakeModuleCommand extends Command
             'Add a link',
             'Delete an element',
             'Install module',
+            'Make migration',
             'Exit'
-            //TODO: Make a migration file
         ];
 
         // Remove first choice if necessary
@@ -216,6 +217,7 @@ class MakeModuleCommand extends Command
             unset($availableChoices[5]);
             unset($availableChoices[6]);
             unset($availableChoices[7]);
+            unset($availableChoices[8]);
         }
 
         $choice = $this->choice('What action do you want to perform?', $availableChoices, $defaultChoiceIndex);
@@ -261,8 +263,13 @@ class MakeModuleCommand extends Command
                 $this->installModule();
                 break;
 
-            // Exit
+            // Make migration
             case $choices[8]:
+                $this->makeMigration();
+                break;
+
+            // Exit
+            case $choices[9]:
                 // Do nothing
                 break;
         }
@@ -950,7 +957,7 @@ class MakeModuleCommand extends Command
         $choices = [
             'Tab',
             'Block',
-            'Field',
+            'Field', //TODO: Delete also column in table
             'Related list',
             'Link'
         ];
@@ -1076,6 +1083,261 @@ class MakeModuleCommand extends Command
 
         $import = new ModuleImport($this->files, $this);
         $import->install($this->module);
+    }
+
+    /**
+     * Make migration file
+     *
+     * @return void
+     */
+    protected function makeMigration()
+    {
+        // Check migration stub file existence (from module-designer package)
+        $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
+
+        if (!$this->files->exists($stubsDirectory . '/migration.stub')) {
+            $this->line('<error>You have to install module-designer to generate the migration file</error> : <comment>composer require uccello/module-designer</comment>');
+            return;
+        }
+
+        // Table fields //TODO: Add a method in uitype to return column creation into string format
+        // foreach ($this->getAllFields() as $_field) {
+        //     uitype($_field->uitype)->createFieldColumn($field, $table);
+        // }
+
+        $modelClassData = explode('\\', $this->module->model);
+
+        // Extract class name
+        $className = array_pop($modelClassData); // Remove last element: Model
+
+        // Module fields
+        if (!empty((array) $this->module->data)) {
+            $data = "json_decode('". json_encode($this->module->data)."')";
+        } else {
+            $data = 'null';
+        }
+
+        $moduleFields = "            'name' => '". $this->module->name ."',\n".
+                        "            'icon' => '". ($this->module->icon ?? null) ."',\n".
+                        "            'model_class' => '". ($this->module->model ?? null) ."',\n".
+                        "            'data' => $data";
+
+        // Table fields
+        $tableFields = '';
+
+        // Tabs, Blocks and Fields
+        $tabsBlocksFields = $this->getTabsBlocksFieldsMigration();
+
+        // Filters
+        $filters = $this->getFiltersMigration();
+
+        // Related lists
+        $relatedLists = $this->getRelatedListsMigration();
+
+        // Links
+        $links = $this->getLinksMigration();
+
+        // Get base path
+        $basePath = '';
+        if (isset($this->module->data->package)) {
+            // Extract vendor and package names
+            $packageParts = explode('/', $this->module->data->package);
+
+            if (count($packageParts) === 2) {
+                $basePath = 'packages/' . $packageParts[0] . '/' . $packageParts[1] . '/';
+            }
+        }
+
+        // New file path
+        $migrationFilePath = $basePath . 'database/migrations/' . date('Y_m_d_His') . '_create_' . str_replace('-', '_', $this->module->name) . '_module.php';
+        // TODO: delete old migration ?
+
+        // Generate content
+        $fileContent = $this->files->get($stubsDirectory . '/migration.stub');
+
+        $content = str_replace(
+            [
+                'ClassName',
+                '%table_name%',
+                '%module_name%',
+                '// %module_fields%',
+                '// %table_fields%',
+                '// %tabs_blocks_fields',
+                '// %filters%',
+                '// %relatedlists%',
+                '// %links%',
+            ],
+            [
+                'Create' . $className . 'Module',
+                $this->module->tableName,
+                $this->module->name,
+                $moduleFields,
+                $tableFields,
+                $tabsBlocksFields,
+                $filters,
+                $relatedLists,
+                $links,
+            ],
+            $fileContent
+        );
+
+        $this->files->put($migrationFilePath, $content);
+
+        $this->chooseAction();
+    }
+
+    /**
+     * Generate migration code for tabs, blocks and fields
+     *
+     * @return string
+     */
+    protected function getTabsBlocksFieldsMigration()
+    {
+        $tabsBlocksFields = '';
+
+        if (!empty($this->module->tabs)) {
+            foreach ($this->module->tabs as $_tab) {
+
+                if (!empty((array) $_tab->data)) {
+                    $data = "json_decode('". json_encode($_tab->data)."')";
+                } else {
+                    $data = 'null';
+                }
+
+                $tabsBlocksFields .= "\n        // Tab $_tab->label\n".
+                                    "        \$tab = new Tab([\n".
+                                    "            'module_id' => \$module->id,\n".
+                                    "            'label' => '$_tab->label',\n".
+                                    "            'icon' => '$_tab->icon',\n".
+                                    "            'sequence' => $_tab->sequence,\n".
+                                    "            'data' => $data\n".
+                                    "         ]);\n".
+                                    "        \$tab->save();\n";
+
+                if (!empty($_tab->blocks)) {
+                    foreach ($_tab->blocks as $_block) {
+
+                        if (!empty((array) $_block->data)) {
+                            $data = "json_decode('". json_encode($_block->data)."')";
+                        } else {
+                            $data = 'null';
+                        }
+
+                        $tabsBlocksFields .= "\n        // Block $_block->label\n".
+                                            "        \$block = new Block([\n".
+                                            "            'module_id' => \$module->id,\n".
+                                            "            'tab_id' => \$tab->id,\n".
+                                            "            'label' => '$_block->label',\n".
+                                            "            'icon' => '$_block->icon',\n".
+                                            "            'sequence' => $_block->sequence,\n".
+                                            "            'data' => $data\n".
+                                            "         ]);\n".
+                                            "        \$block->save();\n";
+
+                        if (!empty($_block->fields)) {
+                            foreach ($_block->fields as $_field) {
+
+                                if (!empty((array) $_field->data)) {
+                                    $data = "json_decode('". json_encode($_field->data)."')";
+                                } else {
+                                    $data = 'null';
+                                }
+
+                                $tabsBlocksFields .= "\n        // Field $_field->name\n".
+                                            "        \$field = new Field([\n".
+                                            "            'module_id' => \$module->id,\n".
+                                            "            'block_id' => \$block->id,\n".
+                                            "            'name' => '$_field->name',\n".
+                                            "            'uitype_id' => uitype('$_field->uitype')->id,\n".
+                                            "            'displaytype_id' => displaytype('$_field->displaytype')->id,\n".
+                                            "            'sequence' => $_field->sequence,\n".
+                                            "            'data' => $data\n".
+                                            "         ]);\n".
+                                            "        \$field->save();\n";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $tabsBlocksFields;
+    }
+
+    /**
+     * Generate migration code for filters
+     *
+     * @return string
+     */
+    protected function getFiltersMigration()
+    {
+        $columns = [];
+        foreach ($this->getAllFields() as $_field) {
+            if ($_field->displayInFilter === true) {
+                $columns[] = $_field->name;
+            }
+        }
+
+        if (!empty($columns)) {
+            $columnsStr = "'" . implode("', '", $columns) . "'";
+        }
+
+        return "\n        // Filter\n".
+                                    "        \$filter = new Filter([\n".
+                                    "            'module_id' => \$module->id,\n".
+                                    "            'domain_id' => null,\n".
+                                    "            'user_id' => null,\n".
+                                    "            'name' => 'filter.all',\n".
+                                    "            'icon' => 'list',\n".
+                                    "            'columns' => [$columnsStr],\n".
+                                    "            'conditions' => null,\n".
+                                    "            'order_by' => null,\n".
+                                    "            'is_default' => null,\n".
+                                    "            'is_public' => null\n".
+                                    "         ]);\n".
+                                    "        \$filter->save();\n";
+    }
+
+    protected function getRelatedListsMigration()
+    {
+        $relatedlists = '';
+
+        if (!empty($this->module->relatedlists)) {
+            foreach ($this->module->relatedlists as $_relatedlist) {
+
+                if (!empty($_relatedlist->tab)) {
+                    $tab = "\$relatedModule->tabs->where('name', '". $_relatedlist->tab ."')->first()->id";
+                } else {
+                    $tab = 'null';
+                }
+
+                if (!empty((array) $_relatedlist->data)) {
+                    $data = "json_decode('". json_encode($_relatedlist->data)."')";
+                } else {
+                    $data = 'null';
+                }
+
+                $relatedlists .= "\n        // Related List $_relatedlist->label\n".
+                                "        \$relatedModule = ucmodule('". $_relatedlist->related_module . "');\n".
+                                "        \$relatedlist = new Relatedlist([\n".
+                                "            'module_id' => \$module->id,\n".
+                                "            'related_module_id' => \$relatedModule->id,\n".
+                                "            'tab_id' => $tab,\n".
+                                "            'type' => '$_relatedlist->type',\n".
+                                "            'method' => '$_relatedlist->method',\n".
+                                "            'data' => $data,\n".
+                                "            'sequence' => $_relatedlist->sequence\n".
+                                "        ]);\n".
+                                "        \$relatedlist->save();\n";
+            }
+        }
+
+        return $relatedlists;
+    }
+
+    protected function getLinksMigration()
+    {
+        //TODO:
     }
 
     /**
