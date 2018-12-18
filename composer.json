@@ -1,15 +1,16 @@
 {
     "name": "uccello/module-designer",
     "description": "Module designer for Uccello.",
+    "version": "1.0.0",
     "type": "library",
     "require": {
-        "uccello/uccello": "0.4.*@dev"
+        "uccello/uccello": "^1.0@dev"
     },
     "license": "MIT",
     "authors": [
         {
             "name": "Jonathan SARDO",
-            "email": "sardoj@gmail.com"
+            "email": "jonathan@uccellolabs.com"
         }
     ],
     "autoload": {
@@ -23,9 +24,6 @@
         }
     },
     "extra": {
-        "branch-alias": {
-            "dev-master": "1.0.x-dev"
-        },
         "laravel": {
             "providers": [
                 "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider",
