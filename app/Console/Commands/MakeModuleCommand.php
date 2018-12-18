@@ -16,8 +16,6 @@ use Uccello\Core\Support\ModuleExport;
 
 class MakeModuleCommand extends Command
 {
-    //TODO: Search how imags do not work in detail view
-
     /**
      * The structure of the module.
      *
@@ -74,6 +72,12 @@ class MakeModuleCommand extends Command
      */
     public function handle()
     {
+        if (!in_array(env('APP_ENV'), ['local', 'dev', 'development'])) {
+            $this->error('You can use this command only in development environment');
+            $this->line('<comment>APP_ENV</comment> (in .env file) must equals to <comment>local | dev | development</comment>');
+            return;
+        }
+
         $this->checkForDesignedModules();
     }
 
@@ -957,7 +961,7 @@ class MakeModuleCommand extends Command
         $choices = [
             'Tab',
             'Block',
-            'Field', //TODO: Delete also column in table
+            'Field',
             'Related list',
             'Link'
         ];
@@ -1100,11 +1104,6 @@ class MakeModuleCommand extends Command
             return;
         }
 
-        // Table fields //TODO: Add a method in uitype to return column creation into string format
-        // foreach ($this->getAllFields() as $_field) {
-        //     uitype($_field->uitype)->createFieldColumn($field, $table);
-        // }
-
         $modelClassData = explode('\\', $this->module->model);
 
         // Extract class name
@@ -1123,7 +1122,7 @@ class MakeModuleCommand extends Command
                         "            'data' => $data";
 
         // Table fields
-        $tableFields = '';
+        $tableFields = $this->getTableFieldsMigration();
 
         // Tabs, Blocks and Fields
         $tabsBlocksFields = $this->getTabsBlocksFieldsMigration();
@@ -1150,7 +1149,6 @@ class MakeModuleCommand extends Command
 
         // New file path
         $migrationFilePath = $basePath . 'database/migrations/' . date('Y_m_d_His') . '_create_' . str_replace('-', '_', $this->module->name) . '_module.php';
-        // TODO: delete old migration ?
 
         // Generate content
         $fileContent = $this->files->get($stubsDirectory . '/migration.stub');
@@ -1183,7 +1181,61 @@ class MakeModuleCommand extends Command
 
         $this->files->put($migrationFilePath, $content);
 
+        $this->line('The file <info>'. $migrationFilePath .' was created.</info>');
+
         $this->chooseAction();
+    }
+
+    /**
+     * Generate migration code for table fields
+     *
+     * @return string
+     */
+    protected function getTableFieldsMigration()
+    {
+        $tableFields = '';
+
+        foreach ($this->getAllFields() as $_field) {
+
+            if (!empty((array) $_field->data)) {
+                $data = $_field->data;
+            } else {
+                $data = null;
+            }
+
+            $field = new Field([
+                'name' => $_field->name,
+                'uitype_id' => uitype($_field->uitype)->id,
+                'displaytype_id' => displaytype($_field->displaytype)->id,
+                'sequence' => $_field->sequence,
+                'data' => $data
+            ]);
+
+            // Get field column creation in string format
+            $createFieldColumnStr = uitype($_field->uitype)->createFieldColumnStr($field);
+
+            // Check if the field is required
+            $isRequired = false;
+            if (isset($_field->data->rules)) {
+                $rules = explode('|', $_field->data->rules);
+
+                if (in_array('required', $rules)) {
+                    $isRequired = true;
+                }
+            }
+
+            // Add nullable() if the field is not required
+            if (!$isRequired) {
+                $createFieldColumnStr .= '->nullable()';
+            }
+
+            // Add semi comma at the and
+            $createFieldColumnStr .= ';';
+
+            $tableFields .= "            $createFieldColumnStr\n";
+        }
+
+        return $tableFields;
     }
 
     /**
@@ -1211,7 +1263,7 @@ class MakeModuleCommand extends Command
                                     "            'icon' => '$_tab->icon',\n".
                                     "            'sequence' => $_tab->sequence,\n".
                                     "            'data' => $data\n".
-                                    "         ]);\n".
+                                    "        ]);\n".
                                     "        \$tab->save();\n";
 
                 if (!empty($_tab->blocks)) {
@@ -1231,7 +1283,7 @@ class MakeModuleCommand extends Command
                                             "            'icon' => '$_block->icon',\n".
                                             "            'sequence' => $_block->sequence,\n".
                                             "            'data' => $data\n".
-                                            "         ]);\n".
+                                            "        ]);\n".
                                             "        \$block->save();\n";
 
                         if (!empty($_block->fields)) {
@@ -1252,7 +1304,7 @@ class MakeModuleCommand extends Command
                                             "            'displaytype_id' => displaytype('$_field->displaytype')->id,\n".
                                             "            'sequence' => $_field->sequence,\n".
                                             "            'data' => $data\n".
-                                            "         ]);\n".
+                                            "        ]);\n".
                                             "        \$field->save();\n";
                             }
                         }
@@ -1288,13 +1340,13 @@ class MakeModuleCommand extends Command
                                     "            'domain_id' => null,\n".
                                     "            'user_id' => null,\n".
                                     "            'name' => 'filter.all',\n".
-                                    "            'icon' => 'list',\n".
+                                    "            'type' => 'list',\n".
                                     "            'columns' => [$columnsStr],\n".
                                     "            'conditions' => null,\n".
                                     "            'order_by' => null,\n".
-                                    "            'is_default' => null,\n".
-                                    "            'is_public' => null\n".
-                                    "         ]);\n".
+                                    "            'is_default' => true,\n".
+                                    "            'is_public' => false\n".
+                                    "        ]);\n".
                                     "        \$filter->save();\n";
     }
 
@@ -1306,7 +1358,7 @@ class MakeModuleCommand extends Command
             foreach ($this->module->relatedlists as $_relatedlist) {
 
                 if (!empty($_relatedlist->tab)) {
-                    $tab = "\$relatedModule->tabs->where('name', '". $_relatedlist->tab ."')->first()->id";
+                    $tab = "\$relatedModule->tabs->where('label', '". $_relatedlist->tab ."')->first()";
                 } else {
                     $tab = 'null';
                 }
@@ -1319,10 +1371,12 @@ class MakeModuleCommand extends Command
 
                 $relatedlists .= "\n        // Related List $_relatedlist->label\n".
                                 "        \$relatedModule = ucmodule('". $_relatedlist->related_module . "');\n".
+                                "        \$tab = $tab;\n".
                                 "        \$relatedlist = new Relatedlist([\n".
                                 "            'module_id' => \$module->id,\n".
                                 "            'related_module_id' => \$relatedModule->id,\n".
-                                "            'tab_id' => $tab,\n".
+                                "            'tab_id' => !empty(\$tab) ? \$tab->id : null,\n".
+                                "            'label' => '$_relatedlist->label',\n".
                                 "            'type' => '$_relatedlist->type',\n".
                                 "            'method' => '$_relatedlist->method',\n".
                                 "            'data' => $data,\n".
@@ -1337,7 +1391,33 @@ class MakeModuleCommand extends Command
 
     protected function getLinksMigration()
     {
-        //TODO:
+        $links = '';
+
+        if (!empty($this->module->links)) {
+            foreach ($this->module->links as $_link) {
+
+                if (!empty((array) $_link->data)) {
+                    $data = "json_decode('". json_encode($_link->data)."')";
+                } else {
+                    $data = 'null';
+                }
+
+                $links .= "\n        // Link $_link->label\n".
+                                "        \$link = new Link([\n".
+                                "            'module_id' => \$module->id,\n".
+                                "            'label' => '$_link->label',\n".
+                                "            'icon' => '$_link->icon',\n".
+                                "            'type' => '$_link->type',\n".
+                                "            'url' => '$_link->url',\n".
+                                "            'sequence' => '$_link->sequence',\n".
+                                "            'data' => $data,\n".
+                                "            'sequence' => $_link->sequence\n".
+                                "        ]);\n".
+                                "        \$link->save();\n";
+            }
+        }
+
+        return $links;
     }
 
     /**

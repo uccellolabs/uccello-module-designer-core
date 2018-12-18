@@ -48,8 +48,7 @@ class ClassName extends Migration
     {
         Schema::create($this->tablePrefix . '%table_name%', function (Blueprint $table) {
             $table->increments('id');
-// %table_fields%
-            $table->timestamps();
+// %table_fields%            $table->timestamps();
             $table->softDeletes();
         });
     }
@@ -72,14 +71,18 @@ class ClassName extends Migration
     }
 
     protected function createTabsBlocksFields($module)
-    {// %tabs_blocks_fields}
+    {// %tabs_blocks_fields
+    }
 
     protected function createFilters($module)
-    {// %filters%}
+    {// %filters%
+    }
 
     protected function createRelatedLists($module)
-    {// %relatedlists%}
+    {// %relatedlists%
+    }
 
     protected function createLinks($module)
-    {// %links%}
+    {// %links%
+    }
 }
