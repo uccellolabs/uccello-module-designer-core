@@ -1156,6 +1156,7 @@ class MakeModuleCommand extends Command
         $content = str_replace(
             [
                 'ClassName',
+                '%table_prefix%',
                 '%table_name%',
                 '%module_name%',
                 '// %module_fields%',
@@ -1167,6 +1168,7 @@ class MakeModuleCommand extends Command
             ],
             [
                 'Create' . $className . 'Module',
+                $this->module->tablePrefix,
                 $this->module->tableName,
                 $this->module->name,
                 $moduleFields,
@@ -1332,6 +1334,8 @@ class MakeModuleCommand extends Command
 
         if (!empty($columns)) {
             $columnsStr = "'" . implode("', '", $columns) . "'";
+        } else {
+            $columnsStr = '';
         }
 
         return "\n        // Filter\n".

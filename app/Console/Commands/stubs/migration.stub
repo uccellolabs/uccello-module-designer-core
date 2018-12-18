@@ -44,6 +44,13 @@ class ClassName extends Migration
         Module::where('name', '%module_name%')->forceDelete();
     }
 
+    protected function initTablePrefix()
+    {
+        $this->tablePrefix = '%table_prefix%';
+
+        return $this->tablePrefix;
+    }
+
     protected function createTable()
     {
         Schema::create($this->tablePrefix . '%table_name%', function (Blueprint $table) {
