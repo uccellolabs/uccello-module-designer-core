@@ -518,7 +518,7 @@ class MakeModuleCommand extends Command
         // Description
         if ($this->confirm('Do you want to add a description?')) {
             $block->data->description = $block->label . '.description';
-            $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Translation [' . $this->locale . ']');
+            $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Description translation [' . $this->locale . ']');
         }
 
         // Icon
@@ -627,6 +627,12 @@ class MakeModuleCommand extends Command
         $default = $this->ask('Default value');
         if (!is_null($default)) {
             $field->data->default = $default;
+        }
+
+        // Info
+        if ($this->confirm('Do you want to add an information text?')) {
+            $field->data->info = 'field.' . $field->name . '.info';
+            $this->module->lang->{$this->locale}->{$field->data->info} = $this->ask('Information translation [' . $this->locale . ']');
         }
 
         // Other rules
