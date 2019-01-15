@@ -4,15 +4,15 @@ namespace Uccello\ModuleDesigner\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Uccello\ModuleDesigner\Models\DesignedModule;
 use Uccello\Core\Models\Uitype;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Displaytype;
-use Uccello\Core\Support\ModuleImport;
-use Uccello\Core\Support\ModuleExport;
+use Uccello\ModuleDesigner\Support\ModuleImport;
+use Uccello\ModuleDesigner\Support\ModuleExport;
+use Uccello\ModuleDesigner\Models\DesignedModule;
 
 class MakeModuleCommand extends Command
 {
@@ -364,7 +364,7 @@ class MakeModuleCommand extends Command
         $this->module->tablePrefix = $this->ask('Table prefix', $defaultPrefix);
 
         // Icon
-        $this->module->icon = $this->ask('Material icon name (e.g. book)');
+        $this->module->icon = $this->ask('Material icon name (See https://material.io/tools/icons)');
 
         // Is for administration
         $isForAdmin = $this->confirm('Is this module for administration panel?');
@@ -434,6 +434,7 @@ class MakeModuleCommand extends Command
 
         $tab = new \StdClass();
         $tab->id = null;
+        $tab->data = new \StdClass();
         $tab->blocks = [];
 
         // Label
@@ -444,7 +445,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $tab->icon = $this->ask('Icon CSS class name');
+        $tab->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
 
         // Sequence
         if (count($this->module->tabs) > 0) {
@@ -522,7 +523,7 @@ class MakeModuleCommand extends Command
         }
 
         // Icon
-        $block->icon = $this->ask('Icon CSS class name');
+        $block->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
 
         // Sequence
         if (count($tab->blocks) > 0) {
@@ -760,7 +761,7 @@ class MakeModuleCommand extends Command
         $relatedList->data->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
 
         // Icon
-        $relatedList->icon = $this->ask('Icon CSS class name');
+        $relatedList->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
 
         // Sequence
         if (count($this->module->relatedLists) > 0) {
@@ -828,7 +829,7 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
-        $link->icon = $this->ask('Icon CSS class name');
+        $link->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
 
         // Type
         $link->type = $this->choice('Type of link', ['detail', 'detail.action'], 'detail');
@@ -1122,8 +1123,10 @@ class MakeModuleCommand extends Command
             $data = 'null';
         }
 
+        $icon = !empty($this->module->icon) ? "'{$this->module->icon}'" : "null";
+
         $moduleFields = "            'name' => '". $this->module->name ."',\n".
-                        "            'icon' => '". ($this->module->icon ?? null) ."',\n".
+                        "            'icon' => $icon,\n".
                         "            'model_class' => '". ($this->module->model ?? null) ."',\n".
                         "            'data' => $data";
 
@@ -1264,11 +1267,13 @@ class MakeModuleCommand extends Command
                     $data = 'null';
                 }
 
+                $icon = !empty($_tab->icon) ? "'$_tab->icon'" : "null";
+
                 $tabsBlocksFields .= "\n        // Tab $_tab->label\n".
                                     "        \$tab = new Tab([\n".
                                     "            'module_id' => \$module->id,\n".
                                     "            'label' => '$_tab->label',\n".
-                                    "            'icon' => '$_tab->icon',\n".
+                                    "            'icon' => $icon,\n".
                                     "            'sequence' => $_tab->sequence,\n".
                                     "            'data' => $data\n".
                                     "        ]);\n".
@@ -1283,12 +1288,14 @@ class MakeModuleCommand extends Command
                             $data = 'null';
                         }
 
+                        $icon = !empty($_block->icon) ? "'$_block->icon'" : "null";
+
                         $tabsBlocksFields .= "\n        // Block $_block->label\n".
                                             "        \$block = new Block([\n".
                                             "            'module_id' => \$module->id,\n".
                                             "            'tab_id' => \$tab->id,\n".
                                             "            'label' => '$_block->label',\n".
-                                            "            'icon' => '$_block->icon',\n".
+                                            "            'icon' => $icon,\n".
                                             "            'sequence' => $_block->sequence,\n".
                                             "            'data' => $data\n".
                                             "        ]);\n".
@@ -1412,11 +1419,13 @@ class MakeModuleCommand extends Command
                     $data = 'null';
                 }
 
+                $icon = !empty($_link->icon) ? "'$_link->icon'" : "null";
+
                 $links .= "\n        // Link $_link->label\n".
                                 "        \$link = new Link([\n".
                                 "            'module_id' => \$module->id,\n".
                                 "            'label' => '$_link->label',\n".
-                                "            'icon' => '$_link->icon',\n".
+                                "            'icon' => $icon,\n".
                                 "            'type' => '$_link->type',\n".
                                 "            'url' => '$_link->url',\n".
                                 "            'sequence' => '$_link->sequence',\n".
