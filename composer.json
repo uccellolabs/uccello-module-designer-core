@@ -1,7 +1,6 @@
 {
     "name": "uccello/module-designer",
     "description": "Module designer for Uccello.",
-    "version": "1.0.1",
     "type": "library",
     "require": {
         "uccello/uccello": "^1.0@dev"
