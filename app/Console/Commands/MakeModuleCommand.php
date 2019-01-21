@@ -1358,11 +1358,12 @@ class MakeModuleCommand extends Command
                                     "            'user_id' => null,\n".
                                     "            'name' => 'filter.all',\n".
                                     "            'type' => 'list',\n".
-                                    "            'columns' => [$columnsStr],\n".
+                                    "            'columns' => [ $columnsStr ],\n".
                                     "            'conditions' => null,\n".
                                     "            'order_by' => null,\n".
                                     "            'is_default' => true,\n".
-                                    "            'is_public' => false\n".
+                                    "            'is_public' => false,\n".
+                                    "            'data' => [ 'readonly' => true ]\n".
                                     "        ]);\n".
                                     "        \$filter->save();\n";
     }

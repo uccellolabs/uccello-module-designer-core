@@ -81,8 +81,6 @@ class ModuleImport
     {
         $this->structure = $module;
 
-        // dd($module);
-
         // Initialize module file path
         $this->initFilePath();
 
@@ -548,6 +546,7 @@ class ModuleImport
         $filter->order_by = null;
         $filter->is_default = true;
         $filter->is_public = false;
+        $filter->data = [ 'readonly' => true ];
         $filter->save();
     }
 
