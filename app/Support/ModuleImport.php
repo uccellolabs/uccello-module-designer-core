@@ -109,7 +109,7 @@ class ModuleImport
         $this->createModelFile($module);
 
         // Delete designed module
-        $this->deleteDesignedModule();
+        // $this->deleteDesignedModule();
     }
 
     protected function initFilePath()
@@ -129,7 +129,7 @@ class ModuleImport
     /**
      * Create module structure in the database
      *
-     * @return void
+     * @return \Uccello\Core\Models\Module
      */
     protected function createModule()
     {
@@ -409,6 +409,7 @@ class ModuleImport
                     }
                 }
 
+                $table->unsignedInteger('domain_id');
                 $table->timestamps();
                 $table->softDeletes();
             });
@@ -560,6 +561,8 @@ class ModuleImport
     {
         if (isset($this->structure->relatedLists)) {
             foreach ($this->structure->relatedLists as $_relatedList) {
+                $relatedModule = Module::where('name', $_relatedList->related_module)->first();
+
                 // Get tab where we want to connect the related list if defined
                 if (isset($_relatedList->tab)) {
                     $tab = Tab::where('module_id', $module->id)
@@ -571,7 +574,7 @@ class ModuleImport
 
                 // Get related field if defined
                 if (isset($_relatedList->related_field)) {
-                    $relatedField = Field::where('module_id', $module->id)
+                    $relatedField = Field::where('module_id', $relatedModule->id)
                         ->where('name', $_relatedList->related_field)
                         ->first();
                 } else {
@@ -580,10 +583,11 @@ class ModuleImport
 
                 $relatedList = Relatedlist::firstOrNew([
                     "module_id" => $module->id,
-                    "related_module_id" => ucmodule($_relatedList->related_module)->id,
+                    "related_module_id" => $relatedModule->id,
                     "label" => $_relatedList->label,
                 ]);
                 $relatedList->tab_id = isset($tab) ? $tab->id : null;
+                $relatedList->related_field_id = isset($relatedField) ? $relatedField->id : null;
                 $relatedList->icon = $_relatedList->icon;
                 $relatedList->type = $_relatedList->type;
                 $relatedList->method = $_relatedList->method;
@@ -653,7 +657,7 @@ class ModuleImport
                 $fileTranslations = $this->files->getRequire($languageFile);
 
                 // Add or update translations ($translations have priority)
-                $translations = array_merge($fileTranslations, (array)$translations);
+                $translations = array_merge((array)$fileTranslations, (array)$translations);
 
                 $message = 'The file <info>'.$languageFile.'</info> already exists. It was <comment>updated</comment>.';
             } else {
@@ -679,18 +683,11 @@ class ModuleImport
     protected function writeLanguageFile(string $filepath, $translations)
     {
         $content = "<?php\n\n".
-                    "return [\n";
+                    "return ";
 
-        foreach ($translations as $label => $translation) {
-            // Do not put translations to remove
-            if (!empty($this->structure->translationsToRemove) && in_array($label, $this->structure->translationsToRemove)) {
-                continue;
-            }
+        $content .= $this->arrayReadableEncode($translations);
 
-            $content .= "    '$label' => '".str_replace("'", "\'", $translation)."',\n";
-        }
-
-        $content .= "];";
+        $content .= ';';
 
         // Create language directory if necessary
         $directory = dirname($filepath);
@@ -778,7 +775,7 @@ class ModuleImport
         $relations = "";
         foreach ($this->getAllFields() as $field) {
             if ($field->uitype === 'entity') {
-                $relatedModule = Module::where('name', $field->data->module)->first();
+                $relatedModule = ucmodule($field->data->module);
 
                 if ($relatedModule) {
                     $relations .= "\n    public function ".$field->name."()\n".
@@ -855,5 +852,54 @@ class ModuleImport
         }
 
         return $fields;
+    }
+
+    protected function arrayReadableEncode($in, $indent = 0, $from_array = false)
+    {
+        $_escape = function ($str)
+        {
+            return preg_replace("!([\b\t\n\r\f\"\\'])!", "\\\\\\1", $str);
+        };
+
+        $out = '';
+
+        foreach ($in as $key=>$value)
+        {
+            $out .= str_repeat("    ", $indent + 1);
+            $out .= "'".$_escape((string)$key)."' => ";
+
+            if (is_object($value) || is_array($value))
+            {
+                $out .= $this->arrayReadableEncode($value, $indent + 1);
+            }
+            elseif (is_bool($value))
+            {
+                $out .= $value ? 'true' : 'false';
+            }
+            elseif (is_null($value))
+            {
+                $out .= 'null';
+            }
+            elseif (is_string($value))
+            {
+                $out .= "'" . $_escape($value) ."'";
+            }
+            else
+            {
+                $out .= $value;
+            }
+
+            $out .= ",\n";
+        }
+
+        if (!empty($out))
+        {
+            $out = substr($out, 0, -2);
+        }
+
+        $out = "[\n" . $out;
+        $out .= "\n" . str_repeat("    ", $indent) . "]";
+
+        return $out;
     }
 }

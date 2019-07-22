@@ -9,7 +9,7 @@ use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Filter;
-use Uccello\Core\Models\RelatedList;
+use Uccello\Core\Models\Relatedlist;
 use Uccello\Core\Models\Link;
 
 class ClassName extends Migration
@@ -55,7 +55,8 @@ class ClassName extends Migration
     {
         Schema::create($this->tablePrefix . '%table_name%', function (Blueprint $table) {
             $table->increments('id');
-// %table_fields%            $table->timestamps();
+// %table_fields%            $table->unsignedInteger('domain_id');
+            $table->timestamps();
             $table->softDeletes();
         });
     }

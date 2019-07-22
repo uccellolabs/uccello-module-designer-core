@@ -60,7 +60,7 @@ class ModuleExport
      * Get module structure
      *
      * @param \Uccello\Core\Models\Module $module
-     * @return string
+     * @return \StdClass
      */
     public function getStructure(Module $module)
     {
@@ -267,9 +267,7 @@ class ModuleExport
             if ($this->files->exists($moduleTranslationFile)) {
                 $translations = $this->files->getRequire($moduleTranslationFile);
 
-                foreach ($translations as $key => $val) {
-                    $this->structure->lang->{$lang}->{$key} = $val;
-                }
+                $this->structure->lang->{$lang} = json_decode(json_encode($translations)); // To force object instead of array
             }
         }
     }

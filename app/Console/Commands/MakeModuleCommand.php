@@ -4,10 +4,9 @@ namespace Uccello\ModuleDesigner\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
 use Uccello\Core\Models\Uitype;
 use Uccello\Core\Models\Module;
-use Uccello\Core\Models\Tab;
-use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Displaytype;
 use Uccello\ModuleDesigner\Support\ModuleImport;
@@ -323,13 +322,20 @@ class MakeModuleCommand extends Command
         $this->module->data = new \StdClass();
         $this->module->lang = new \StdClass();
         $this->module->lang->{$this->locale} = new \StdClass();
+        $this->module->lang->{$this->locale}->tab = new \StdClass();
+        $this->module->lang->{$this->locale}->block = new \StdClass();
+        $this->module->lang->{$this->locale}->block_description = new \StdClass();
+        $this->module->lang->{$this->locale}->field = new \StdClass();
+        $this->module->lang->{$this->locale}->field_info = new \StdClass();
+        $this->module->lang->{$this->locale}->relatedlist = new \StdClass();
+        $this->module->lang->{$this->locale}->link = new \StdClass();
 
         // Name
         $this->module->name = kebab_case($moduleName);
 
         // Translation
         $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural [' . $this->locale . ']');
-        $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single [' . $this->locale . ']');
+        // $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single [' . $this->locale . ']');
 
         // Model class
         $defaultModelClass = 'App\\' . studly_case($moduleName); // The studly_case function converts the given string to StudlyCase
@@ -375,7 +381,7 @@ class MakeModuleCommand extends Command
         // Link
         $defaultRoute = $this->ask('Default route', 'uccello.list');
         if ($defaultRoute !== 'uccello.list') {
-            $this->module->data->route = $defaultRoute;
+            $this->module->data->menu = $defaultRoute;
         }
 
         // Display module data
@@ -442,7 +448,7 @@ class MakeModuleCommand extends Command
         $tab->label = $this->ask('Tab label (will be translated)', $defaultLabel);
 
         // Translation
-        $this->module->lang->{$this->locale}->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->tab->{$tab->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
         $tab->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
@@ -514,12 +520,12 @@ class MakeModuleCommand extends Command
         $block->label = 'block.' . $label;
 
         // Translation
-        $this->module->lang->{$this->locale}->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->block->{$block->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Description
         if ($this->confirm('Do you want to add a description?')) {
-            $block->data->description = $block->label . '.description';
-            $this->module->lang->{$this->locale}->{$block->data->description} = $this->ask('Description translation [' . $this->locale . ']');
+            $block->data->description = 'block_description.' . $block->label;
+            $this->module->lang->{$this->locale}->block_description->{$block->label} = $this->ask('Description translation [' . $this->locale . ']');
         }
 
         // Icon
@@ -602,7 +608,7 @@ class MakeModuleCommand extends Command
         }
 
         // Translation
-        $this->module->lang->{$this->locale}->{'field.' . $field->name} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->field->{$field->name} = $this->ask('Translation [' . $this->locale . ']');
 
         // Uitype
         $field->uitype = $this->choice('Choose an uitype', $this->getUitypes(), 'text');
@@ -632,8 +638,8 @@ class MakeModuleCommand extends Command
 
         // Info
         if ($this->confirm('Do you want to add an information text?')) {
-            $field->data->info = 'field.' . $field->name . '.info';
-            $this->module->lang->{$this->locale}->{$field->data->info} = $this->ask('Information translation [' . $this->locale . ']');
+            $field->data->info = 'field_info.' . $field->name;
+            $this->module->lang->{$this->locale}->field_info->{$field->name} = $this->ask('Information translation [' . $this->locale . ']');
         }
 
         // Other rules
@@ -712,7 +718,7 @@ class MakeModuleCommand extends Command
         $relatedList->label = 'relatedlist.' . $label;
 
         // Translation
-        $this->module->lang->{$this->locale}->{$relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->relatedlist->{$label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Type
         $relatedList->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
@@ -823,10 +829,10 @@ class MakeModuleCommand extends Command
         // Label
         $defaultLabel = 'link' . count($this->module->links);
         $label = $this->ask('Link label (will be translated)', $defaultLabel);
-        $link->label = 'link.' . $label;
+        $link->label = $label;
 
         // Translation
-        $this->module->lang->{$this->locale}->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->link->{$link->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Icon
         $link->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
@@ -1094,6 +1100,11 @@ class MakeModuleCommand extends Command
 
         $import = new ModuleImport($this->files, $this);
         $import->install($this->module);
+
+        Artisan::call('cache:clear');
+
+        // Ask the user to choose another action
+        $this->chooseAction();
     }
 
     /**
@@ -1270,14 +1281,13 @@ class MakeModuleCommand extends Command
                 $icon = !empty($_tab->icon) ? "'$_tab->icon'" : "null";
 
                 $tabsBlocksFields .= "\n        // Tab $_tab->label\n".
-                                    "        \$tab = new Tab([\n".
+                                    "        \$tab = Tab::create([\n".
                                     "            'module_id' => \$module->id,\n".
                                     "            'label' => '$_tab->label',\n".
                                     "            'icon' => $icon,\n".
                                     "            'sequence' => $_tab->sequence,\n".
                                     "            'data' => $data\n".
-                                    "        ]);\n".
-                                    "        \$tab->save();\n";
+                                    "        ]);\n";
 
                 if (!empty($_tab->blocks)) {
                     foreach ($_tab->blocks as $_block) {
@@ -1291,15 +1301,14 @@ class MakeModuleCommand extends Command
                         $icon = !empty($_block->icon) ? "'$_block->icon'" : "null";
 
                         $tabsBlocksFields .= "\n        // Block $_block->label\n".
-                                            "        \$block = new Block([\n".
+                                            "        \$block = Block::create([\n".
                                             "            'module_id' => \$module->id,\n".
                                             "            'tab_id' => \$tab->id,\n".
                                             "            'label' => '$_block->label',\n".
                                             "            'icon' => $icon,\n".
                                             "            'sequence' => $_block->sequence,\n".
                                             "            'data' => $data\n".
-                                            "        ]);\n".
-                                            "        \$block->save();\n";
+                                            "        ]);\n";
 
                         if (!empty($_block->fields)) {
                             foreach ($_block->fields as $_field) {
@@ -1311,7 +1320,7 @@ class MakeModuleCommand extends Command
                                 }
 
                                 $tabsBlocksFields .= "\n        // Field $_field->name\n".
-                                            "        \$field = new Field([\n".
+                                            "        Field::create([\n".
                                             "            'module_id' => \$module->id,\n".
                                             "            'block_id' => \$block->id,\n".
                                             "            'name' => '$_field->name',\n".
@@ -1319,8 +1328,7 @@ class MakeModuleCommand extends Command
                                             "            'displaytype_id' => displaytype('$_field->displaytype')->id,\n".
                                             "            'sequence' => $_field->sequence,\n".
                                             "            'data' => $data\n".
-                                            "        ]);\n".
-                                            "        \$field->save();\n";
+                                            "        ]);\n";
                             }
                         }
                     }
@@ -1352,7 +1360,7 @@ class MakeModuleCommand extends Command
         }
 
         return "\n        // Filter\n".
-                                    "        \$filter = new Filter([\n".
+                                    "        Filter::create([\n".
                                     "            'module_id' => \$module->id,\n".
                                     "            'domain_id' => null,\n".
                                     "            'user_id' => null,\n".
@@ -1364,8 +1372,7 @@ class MakeModuleCommand extends Command
                                     "            'is_default' => true,\n".
                                     "            'is_public' => false,\n".
                                     "            'data' => [ 'readonly' => true ]\n".
-                                    "        ]);\n".
-                                    "        \$filter->save();\n";
+                                    "        ]);\n";
     }
 
     protected function getRelatedListsMigration()
@@ -1376,9 +1383,15 @@ class MakeModuleCommand extends Command
             foreach ($this->module->relatedlists as $_relatedlist) {
 
                 if (!empty($_relatedlist->tab)) {
-                    $tab = "\$relatedModule->tabs->where('label', '". $_relatedlist->tab ."')->first()";
+                    $tab = "\$module->tabs->where('label', '". $_relatedlist->tab ."')->first()";
                 } else {
                     $tab = 'null';
+                }
+
+                if (!empty($_relatedlist->related_field)) {
+                    $relatedField = "\$relatedModule->fields->where('name', '". $_relatedlist->related_field ."')->first()";
+                } else {
+                    $relatedField = 'null';
                 }
 
                 if (!empty((array) $_relatedlist->data)) {
@@ -1387,20 +1400,22 @@ class MakeModuleCommand extends Command
                     $data = 'null';
                 }
 
+                //TODO: related_field_id
+
                 $relatedlists .= "\n        // Related List $_relatedlist->label\n".
-                                "        \$relatedModule = ucmodule('". $_relatedlist->related_module . "');\n".
-                                "        \$tab = $tab;\n".
-                                "        \$relatedlist = new Relatedlist([\n".
+                                "        \$relatedModule = Module::where('name', '". $_relatedlist->related_module . "')->first();\n".
+                                "        \n".
+                                "        Relatedlist::create([\n".
                                 "            'module_id' => \$module->id,\n".
                                 "            'related_module_id' => \$relatedModule->id,\n".
-                                "            'tab_id' => !empty(\$tab) ? \$tab->id : null,\n".
+                                "            'tab_id' => $tab,\n".
+                                "            'related_field_id' => $relatedField,\n".
                                 "            'label' => '$_relatedlist->label',\n".
                                 "            'type' => '$_relatedlist->type',\n".
                                 "            'method' => '$_relatedlist->method',\n".
                                 "            'data' => $data,\n".
                                 "            'sequence' => $_relatedlist->sequence\n".
-                                "        ]);\n".
-                                "        \$relatedlist->save();\n";
+                                "        ]);\n";
             }
         }
 
@@ -1423,7 +1438,7 @@ class MakeModuleCommand extends Command
                 $icon = !empty($_link->icon) ? "'$_link->icon'" : "null";
 
                 $links .= "\n        // Link $_link->label\n".
-                                "        \$link = new Link([\n".
+                                "        \$link = Link::create([\n".
                                 "            'module_id' => \$module->id,\n".
                                 "            'label' => '$_link->label',\n".
                                 "            'icon' => $icon,\n".
@@ -1432,8 +1447,7 @@ class MakeModuleCommand extends Command
                                 "            'sequence' => '$_link->sequence',\n".
                                 "            'data' => $data,\n".
                                 "            'sequence' => $_link->sequence\n".
-                                "        ]);\n".
-                                "        \$link->save();\n";
+                                "        ]);\n";
             }
         }
 
@@ -1638,7 +1652,7 @@ class MakeModuleCommand extends Command
      * Ask the user to select a module
      *
      * @param string $message
-     * @return string
+     * @return Module|null
      */
     protected function selectModule($message = null)
     {
@@ -1722,13 +1736,13 @@ class MakeModuleCommand extends Command
     /**
      * Select item from a list
      *
-     * @param array $list
+     * @param array|Collection $list
      * @param string $attribute
      * @param string|null $message
      * @param boolean $autoSelect
      * @return mixed
      */
-    protected function selectFromList(array $list, string $attribute, string $message = null, bool $autoSelect = false)
+    protected function selectFromList($list, string $attribute, string $message = null, bool $autoSelect = false)
     {
         if (empty($list)) {
             return null;

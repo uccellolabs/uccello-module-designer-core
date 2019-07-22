@@ -3,7 +3,7 @@
     "description": "Module designer for Uccello.",
     "type": "library",
     "require": {
-        "uccello/uccello": "^1.0@dev"
+        "uccello/uccello": "1.0.*"
     },
     "license": "MIT",
     "authors": [
