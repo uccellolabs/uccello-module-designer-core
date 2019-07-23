@@ -775,7 +775,7 @@ class ModuleImport
         $relations = "";
         foreach ($this->getAllFields() as $field) {
             if ($field->uitype === 'entity') {
-                $relatedModule = ucmodule($field->data->module);
+                $relatedModule = Module::where('name', $field->data->module)->first();
 
                 if ($relatedModule) {
                     $relations .= "\n    public function ".$field->name."()\n".
@@ -784,6 +784,19 @@ class ModuleImport
                                 "    }\n";
                 }
             }
+        }
+
+        foreach ($this->structure->relatedlists as $relatedList) {
+            if ($relatedList->type !== 'n-n') {
+                continue;
+            }
+
+            $relatedModule = Module::where('name', $relatedList->related_module)->first();
+
+            $relations .= "\n    public function ".$relatedList->relation->relationName."()\n".
+                            "    {\n".
+                            "        return \$this->belongsToMany(\\".$relatedModule->model_class."::class, '".$relatedList->relation->tableName."')->withTimestamps();\n".
+                            "    }\n";
         }
 
         // Generate content

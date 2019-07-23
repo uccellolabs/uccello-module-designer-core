@@ -6,6 +6,7 @@ use Illuminate\Filesystem\Filesystem;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Field;
+use Illuminate\Support\Str;
 
 class ModuleExport
 {
@@ -195,10 +196,13 @@ class ModuleExport
         }
 
         foreach ($module->relatedlists as $relatedlist) {
+            $_module = Module::find($relatedlist->module_id);
+            $_relatedModule = Module::find($relatedlist->related_module_id);
+
             $_relatedlist = new \StdClass();
             $_relatedlist->id = $relatedlist->id;
-            $_relatedlist->module = ucmodule($relatedlist->module_id)->name;
-            $_relatedlist->related_module = ucmodule($relatedlist->related_module_id)->name;
+            $_relatedlist->module = $_module->name;
+            $_relatedlist->related_module = $_relatedModule->name;
             $_relatedlist->tab = $relatedlist->tab_id ? Tab::find($relatedlist->tab_id)->label : null;
             $_relatedlist->related_field = $relatedlist->related_field_id ? Field::find($relatedlist->related_field_id)->name : null;
             $_relatedlist->label = $relatedlist->label;
@@ -207,6 +211,19 @@ class ModuleExport
             $_relatedlist->method = $relatedlist->method;
             $_relatedlist->sequence = $relatedlist->sequence;
             $_relatedlist->data = $relatedlist->data;
+
+            if ($_relatedlist->type === 'n-n') {
+                $modelClass = $_relatedModule->model_class;
+                $relatedModel = new $modelClass();
+
+                $_relatedlist->relation = new \StdClass();
+                $_relatedlist->relation->relationName = $_relatedlist->data->relationName ?? Str::plural($_relatedModule->name);
+                $_relatedlist->relation->tableName = 'rl_' . Str::plural($_module->name) . '_' . Str::plural($_relatedModule->name);
+                $_relatedlist->relation->field1 = $_module->name . '_id';
+                $_relatedlist->relation->field2 = $_relatedModule->name . '_id';
+                $_relatedlist->relation->table1 = $this->structure->tableName;
+                $_relatedlist->relation->table2 = $relatedModel->getTable();
+            }
 
             $this->structure->relatedlists[ ] = $_relatedlist;
         }
