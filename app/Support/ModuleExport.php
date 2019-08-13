@@ -283,9 +283,9 @@ class ModuleExport
 
             if ($this->files->exists($moduleTranslationFile)) {
                 $translations = $this->files->getRequire($moduleTranslationFile);
-
                 $this->structure->lang->{$lang} = json_decode(json_encode($translations)); // To force object instead of array
             }
+            
         }
     }
 
