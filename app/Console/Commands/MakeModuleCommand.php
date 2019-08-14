@@ -12,6 +12,7 @@ use Uccello\Core\Models\Displaytype;
 use Uccello\ModuleDesigner\Support\ModuleImport;
 use Uccello\ModuleDesigner\Support\ModuleExport;
 use Uccello\ModuleDesigner\Models\DesignedModule;
+use Illuminate\Support\Str;
 
 class MakeModuleCommand extends Command
 {
@@ -710,6 +711,7 @@ class MakeModuleCommand extends Command
         $relatedList = new \StdClass();
         $relatedList->id = null;
         $relatedList->data = new \StdClass();
+        $relatedList->relation = new \StdClass();
 
         // Label
         $relatedListIndex = count($this->module->relatedLists)+1;
@@ -734,6 +736,21 @@ class MakeModuleCommand extends Command
             $relatedList->related_field = $relatedField->name;
         } else {
             $relatedList->related_field = null;
+
+            $modelClass = $relatedModule->model_class;
+            $relatedModel = new $modelClass();
+
+            $defaultRelationTableName = 'rl_' . Str::plural($this->module->name) . '_' . Str::plural($relatedModule->name);
+            $relatedList->relation->relationName = $this->ask('Relation name', Str::plural($relatedModule->name));
+            $relatedList->relation->tableName = $this->ask('Relation table name', $defaultRelationTableName);
+            $relatedList->relation->field1 = $this->module->name . '_id';
+            $relatedList->relation->field2 = $relatedModule->name . '_id';
+            $relatedList->relation->table1 = $this->module->tableName;
+            $relatedList->relation->table2 = $relatedModel->getTable();
+
+            if ($relatedList->relation->relationName !== Str::plural($relatedModule->name)) {
+                $relatedList->data->relationName = $relatedList->relation->relationName;
+            }
         }
 
         // Tab
@@ -1117,7 +1134,7 @@ class MakeModuleCommand extends Command
         // Check migration stub file existence (from module-designer package)
         $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
 
-        if (!$this->files->exists($stubsDirectory . '/migration.stub')) {
+        if (!$this->files->exists($stubsDirectory . '/module_migration.stub')) {
             $this->line('<error>You have to install module-designer to generate the migration file</error> : <comment>composer require uccello/module-designer</comment>');
             return;
         }
@@ -1157,21 +1174,13 @@ class MakeModuleCommand extends Command
         $links = $this->getLinksMigration();
 
         // Get base path
-        $basePath = '';
-        if (isset($this->module->data->package)) {
-            // Extract vendor and package names
-            $packageParts = explode('/', $this->module->data->package);
-
-            if (count($packageParts) === 2) {
-                $basePath = 'packages/' . $packageParts[0] . '/' . $packageParts[1] . '/';
-            }
-        }
+        $basePath = $this->getBasepath();
 
         // New file path
         $migrationFilePath = $basePath . 'database/migrations/' . date('Y_m_d_His') . '_create_' . str_replace('-', '_', $this->module->name) . '_module.php';
 
         // Generate content
-        $fileContent = $this->files->get($stubsDirectory . '/migration.stub');
+        $fileContent = $this->files->get($stubsDirectory . '/module_migration.stub');
 
         $content = str_replace(
             [
@@ -1204,6 +1213,8 @@ class MakeModuleCommand extends Command
         $this->files->put($migrationFilePath, $content);
 
         $this->line('The file <info>'. $migrationFilePath .' was created.</info>');
+
+        $this->createRelatedListsMigrations();
 
         $this->chooseAction();
     }
@@ -1400,8 +1411,6 @@ class MakeModuleCommand extends Command
                     $data = 'null';
                 }
 
-                //TODO: related_field_id
-
                 $relatedlists .= "\n        // Related List $_relatedlist->label\n".
                                 "        \$relatedModule = Module::where('name', '". $_relatedlist->related_module . "')->first();\n".
                                 "        \n".
@@ -1452,6 +1461,55 @@ class MakeModuleCommand extends Command
         }
 
         return $links;
+    }
+
+    protected function createRelatedListsMigrations()
+    {
+        if (!empty($this->module->relatedlists)) {
+            foreach ($this->module->relatedlists as $_relatedlist) {
+                if ($_relatedlist->type !== 'n-n') {
+                    continue;
+                }
+
+                // Check migration stub file existence (from module-designer package)
+                $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
+
+                if ($this->files->exists($stubsDirectory . '/relatedlist_migration.stub')) {
+                    // Generate content
+                    $fileContent = $this->files->get($stubsDirectory . '/relatedlist_migration.stub');
+
+                    $className = Str::studly($_relatedlist->relation->tableName);
+
+                    $content = str_replace(
+                        [
+                            'ClassName',
+                            '%table_name%',
+                            '%field1%',
+                            '%field2%',
+                            '%table1%',
+                            '%table2%',
+
+                        ],
+                        [
+                            'Create' . $className . 'Table',
+                            $_relatedlist->relation->tableName,
+                            $_relatedlist->relation->field1,
+                            $_relatedlist->relation->field2,
+                            $_relatedlist->relation->table1,
+                            $_relatedlist->relation->table2,
+                        ],
+                        $fileContent
+                    );
+
+                    // New file path
+                    $migrationFilePath = $this->getBasePath() . 'database/migrations/' . date('Y_m_d_His') . '_create_' . $_relatedlist->relation->tableName . '_table.php';
+
+                    $this->files->put($migrationFilePath, $content);
+
+                    $this->line('The file <info>'. $migrationFilePath .' was created.</info>');
+                }
+            }
+        }
     }
 
     /**
@@ -1832,5 +1890,23 @@ class MakeModuleCommand extends Command
         }
 
         $this->module->translationsToRemove[] = $label;
+    }
+
+    /**
+     * Get base path
+     *
+     * @return string
+     */
+    protected function getBasePath()
+    {
+        $basePath = '';
+        if (isset($this->module->data->package)) {
+            // Extract vendor and package names
+            $packageParts = explode('/', $this->module->data->package);
+
+            if (count($packageParts) === 2) {
+                $basePath = 'packages/' . $packageParts[0] . '/' . $packageParts[1] . '/';
+            }
+        }
     }
 }
