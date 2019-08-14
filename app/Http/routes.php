@@ -16,4 +16,5 @@ Route::name('uccello.module-designer.')->group(function () {
     Route::get($domainAndModuleParams . '/create', 'CreateController@process')->name('create');
     Route::get($domainAndModuleParams . '/update', 'UpdateController@process')->name('update');
     Route::get($domainAndModuleParams . '/settings', 'SettingsController@process')->name('settings');
+    Route::get($domainAndModuleParams . '/uitypes', 'CreateController@getUitypes')->name('uitypes');
 });

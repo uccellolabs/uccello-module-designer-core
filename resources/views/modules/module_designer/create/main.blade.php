@@ -2,16 +2,16 @@
 
 @section('page', 'index')
 
+@section('uccello-extra-css')
+    {{ Html::style('vendor/uccello/module-designer/css/app.css') }}
+@show
+
+@section('uccello-extra-script')
+    {{ Html::script('vendor/uccello/module-designer/js/app.js') }}
+@endsection
+
 @section('content')
-<div class="row clearfix">
-    <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
-        <div class="card">
-            <div class="body">
-                <div class="row">
-                    Create
-                </div>
-            </div>
-        </div>
-    </div>
+<div id="app-module-designer">
+    <module-designer></module-designer>
 </div>
 @endsection
