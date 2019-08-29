@@ -58,6 +58,8 @@ class ClassName extends Migration
 // %table_fields%            $table->unsignedInteger('domain_id');
             $table->timestamps();
             $table->softDeletes();
+
+            $table->foreign('domain_id')->references('id')->on('uccello_domains');
         });
     }
 
