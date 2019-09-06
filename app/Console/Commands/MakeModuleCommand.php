@@ -192,6 +192,7 @@ class MakeModuleCommand extends Command
      */
     protected function chooseAction($defaultChoiceIndex = null, $canCreateModule = false)
     {
+
         // Default choices
         $choices = [
             'Create a new module',
@@ -224,7 +225,7 @@ class MakeModuleCommand extends Command
             unset($availableChoices[8]);
         }
 
-        $choice = $this->choice('What action do you want to perform?', $availableChoices, $defaultChoiceIndex);
+        $choice = $this->choice('What actions do you want to perform?', $availableChoices, $defaultChoiceIndex);
 
         switch ($choice) {
             // Create a new module
@@ -720,7 +721,7 @@ class MakeModuleCommand extends Command
         $relatedList->label = 'relatedlist.' . $label;
 
         // Translation
-        $this->module->lang->{$this->locale}->relatedlist->{$label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->relatedlist->{$relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Type
         $relatedList->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
@@ -1394,7 +1395,7 @@ class MakeModuleCommand extends Command
             foreach ($this->module->relatedlists as $_relatedlist) {
 
                 if (!empty($_relatedlist->tab)) {
-                    $tab = "\$module->tabs->where('label', '". $_relatedlist->tab ."')->first()";
+                    $tab = "\$module->tabs->where('label', '". $_relatedlist->tab ."')->first()->id";
                 } else {
                     $tab = 'null';
                 }
