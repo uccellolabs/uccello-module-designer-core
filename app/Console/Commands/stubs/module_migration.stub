@@ -60,15 +60,16 @@ class ClassName extends Migration
             $table->softDeletes();
 
             $table->foreign('domain_id')->references('id')->on('uccello_domains');
+// %table_foreign_keys%
         });
     }
 
     protected function createModule()
     {
-        $module = new Module([
+        $module = Module::create([
 // %module_fields%
         ]);
-        $module->save();
+
         return $module;
     }
 
