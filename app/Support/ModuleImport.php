@@ -786,17 +786,20 @@ class ModuleImport
             }
         }
 
-        foreach ($this->structure->relatedlists as $relatedList) {
-            if ($relatedList->type !== 'n-n') {
-                continue;
+        if(isset($this->structure->relatedLists))
+        {
+            foreach ($this->structure->relatedlists as $relatedList) {
+                if ($relatedList->type !== 'n-n') {
+                    continue;
+                }
+
+                $relatedModule = Module::where('name', $relatedList->related_module)->first();
+
+                $relations .= "\n    public function ".$relatedList->relation->relationName."()\n".
+                                "    {\n".
+                                "        return \$this->belongsToMany(\\".$relatedModule->model_class."::class, '".$relatedList->relation->tableName."')->withTimestamps();\n".
+                                "    }\n";
             }
-
-            $relatedModule = Module::where('name', $relatedList->related_module)->first();
-
-            $relations .= "\n    public function ".$relatedList->relation->relationName."()\n".
-                            "    {\n".
-                            "        return \$this->belongsToMany(\\".$relatedModule->model_class."::class, '".$relatedList->relation->tableName."')->withTimestamps();\n".
-                            "    }\n";
         }
 
         // Generate content
