@@ -1387,7 +1387,7 @@ class MakeModuleCommand extends Command
                                     "            'type' => 'list',\n".
                                     "            'columns' => [ $columnsStr ],\n".
                                     "            'conditions' => null,\n".
-                                    "            'order_by' => null,\n".
+                                    "            'order' => null,\n".
                                     "            'is_default' => true,\n".
                                     "            'is_public' => false,\n".
                                     "            'data' => [ 'readonly' => true ]\n".

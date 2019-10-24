@@ -544,7 +544,7 @@ class ModuleImport
         ]);
         $filter->columns = $columns;
         $filter->conditions = null;
-        $filter->order_by = null;
+        $filter->order = null;
         $filter->is_default = true;
         $filter->is_public = false;
         $filter->data = [ 'readonly' => true ];
