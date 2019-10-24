@@ -19,7 +19,7 @@ class MakeModuleCommand extends Command
     /**
      * The structure of the module.
      *
-     * @var \StdClass
+     * @var \stdClass
      */
     protected $module;
 
@@ -192,7 +192,6 @@ class MakeModuleCommand extends Command
      */
     protected function chooseAction($defaultChoiceIndex = null, $canCreateModule = false)
     {
-
         // Default choices
         $choices = [
             'Create a new module',
@@ -204,6 +203,7 @@ class MakeModuleCommand extends Command
             'Delete an element',
             'Install module',
             'Make migration',
+            'Finish',
             'Exit'
         ];
 
@@ -223,6 +223,7 @@ class MakeModuleCommand extends Command
             unset($availableChoices[6]);
             unset($availableChoices[7]);
             unset($availableChoices[8]);
+            unset($availableChoices[9]);
         }
 
         $choice = $this->choice('What actions do you want to perform?', $availableChoices, $defaultChoiceIndex);
@@ -273,8 +274,14 @@ class MakeModuleCommand extends Command
                 $this->makeMigration();
                 break;
 
-            // Exit
+            // Finish
             case $choices[9]:
+                // Delete designed module
+                $this->deleteDesignedModule();
+                break;
+
+            // Exit
+            case $choices[10]:
                 // Do nothing
                 break;
         }
@@ -320,17 +327,17 @@ class MakeModuleCommand extends Command
         }
 
         // Create an empty object
-        $this->module = new \StdClass();
-        $this->module->data = new \StdClass();
-        $this->module->lang = new \StdClass();
-        $this->module->lang->{$this->locale} = new \StdClass();
-        $this->module->lang->{$this->locale}->tab = new \StdClass();
-        $this->module->lang->{$this->locale}->block = new \StdClass();
-        $this->module->lang->{$this->locale}->block_description = new \StdClass();
-        $this->module->lang->{$this->locale}->field = new \StdClass();
-        $this->module->lang->{$this->locale}->field_info = new \StdClass();
-        $this->module->lang->{$this->locale}->relatedlist = new \StdClass();
-        $this->module->lang->{$this->locale}->link = new \StdClass();
+        $this->module = new \stdClass();
+        $this->module->data = new \stdClass();
+        $this->module->lang = new \stdClass();
+        $this->module->lang->{$this->locale} = new \stdClass();
+        $this->module->lang->{$this->locale}->tab = new \stdClass();
+        $this->module->lang->{$this->locale}->block = new \stdClass();
+        $this->module->lang->{$this->locale}->block_description = new \stdClass();
+        $this->module->lang->{$this->locale}->field = new \stdClass();
+        $this->module->lang->{$this->locale}->field_info = new \stdClass();
+        $this->module->lang->{$this->locale}->relatedlist = new \stdClass();
+        $this->module->lang->{$this->locale}->link = new \stdClass();
 
         // Name
         $this->module->name = kebab_case($moduleName);
@@ -440,9 +447,9 @@ class MakeModuleCommand extends Command
             $this->module->tabs = [];
         }
 
-        $tab = new \StdClass();
+        $tab = new \stdClass();
         $tab->id = null;
-        $tab->data = new \StdClass();
+        $tab->data = new \stdClass();
         $tab->blocks = [];
 
         // Label
@@ -511,9 +518,9 @@ class MakeModuleCommand extends Command
             $tab->blocks = [];
         }
 
-        $block = new \StdClass();
+        $block = new \stdClass();
         $block->id = null;
-        $block->data = new \StdClass();
+        $block->data = new \stdClass();
         $block->fields = [];
 
         // Label
@@ -592,9 +599,9 @@ class MakeModuleCommand extends Command
             $block->fields = [];
         }
 
-        $field = new \StdClass();
+        $field = new \stdClass();
         $field->id = null;
-        $field->data = new \StdClass();
+        $field->data = new \stdClass();
 
         // Name
         $field->name = $this->ask('Field name');
@@ -705,52 +712,52 @@ class MakeModuleCommand extends Command
         // Check module existence
         $this->checkModuleExistence();
 
-        if (!isset($this->module->relatedLists)) {
-            $this->module->relatedLists = [];
+        if (!isset($this->module->relatedlists)) {
+            $this->module->relatedlists = [];
         }
 
-        $relatedList = new \StdClass();
-        $relatedList->id = null;
-        $relatedList->data = new \StdClass();
-        $relatedList->relation = new \StdClass();
+        $relatedlist = new \stdClass();
+        $relatedlist->id = null;
+        $relatedlist->data = new \stdClass();
+        $relatedlist->relation = new \stdClass();
 
         // Label
-        $relatedListIndex = count($this->module->relatedLists)+1;
-        $defaultLabel = 'relatedlist'.$relatedListIndex;
+        $relatedlistIndex = count($this->module->relatedlists)+1;
+        $defaultLabel = 'relatedlist'.$relatedlistIndex;
         $label = $this->ask('Choose a label (will be translated)', $defaultLabel);
-        $relatedList->label = 'relatedlist.' . $label;
+        $relatedlist->label = 'relatedlist.' . $label;
 
         // Translation
-        $this->module->lang->{$this->locale}->relatedlist->{$relatedList->label} = $this->ask('Translation [' . $this->locale . ']');
+        $this->module->lang->{$this->locale}->relatedlist->{$relatedlist->label} = $this->ask('Translation [' . $this->locale . ']');
 
         // Type
-        $relatedList->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
-        $relatedList->type = str_replace('Relation ', '', $relatedList->type);
+        $relatedlist->type = $this->choice('Choose a type', ['Relation n-1', 'Relation n-n']);
+        $relatedlist->type = str_replace('Relation ', '', $relatedlist->type);
 
         // Related Module
         $relatedModule = $this->selectModule('Select the related module');
-        $relatedList->related_module = $relatedModule->name;
+        $relatedlist->related_module = $relatedModule->name;
 
         // Related field
-        if ($relatedList->type === 'n-1') {
+        if ($relatedlist->type === 'n-1') {
             $relatedField = $this->selectField($relatedModule);
-            $relatedList->related_field = $relatedField->name;
+            $relatedlist->related_field = $relatedField->name;
         } else {
-            $relatedList->related_field = null;
+            $relatedlist->related_field = null;
 
             $modelClass = $relatedModule->model_class;
             $relatedModel = new $modelClass();
 
             $defaultRelationTableName = 'rl_' . Str::plural($this->module->name) . '_' . Str::plural($relatedModule->name);
-            $relatedList->relation->relationName = $this->ask('Relation name', Str::plural($relatedModule->name));
-            $relatedList->relation->tableName = $this->ask('Relation table name', $defaultRelationTableName);
-            $relatedList->relation->field1 = $this->module->name . '_id';
-            $relatedList->relation->field2 = $relatedModule->name . '_id';
-            $relatedList->relation->table1 = $this->module->tableName;
-            $relatedList->relation->table2 = $relatedModel->getTable();
+            $relatedlist->relation->relationName = $this->ask('Relation name', Str::plural($relatedModule->name));
+            $relatedlist->relation->tableName = $this->ask('Relation table name', $defaultRelationTableName);
+            $relatedlist->relation->field1 = $this->module->name . '_id';
+            $relatedlist->relation->field2 = $relatedModule->name . '_id';
+            $relatedlist->relation->table1 = $this->module->tableName;
+            $relatedlist->relation->table2 = $relatedModel->getTable();
 
-            if ($relatedList->relation->relationName !== Str::plural($relatedModule->name)) {
-                $relatedList->data->relationName = $relatedList->relation->relationName;
+            if ($relatedlist->relation->relationName !== Str::plural($relatedModule->name)) {
+                $relatedlist->data->relationName = $relatedlist->relation->relationName;
             }
         }
 
@@ -758,17 +765,17 @@ class MakeModuleCommand extends Command
         $displayInTab = $this->confirm('Do you want to display it in an existant tab? By default it will create a new tab.', false);
         if ($displayInTab) {
             $tab = $this->selectTab();
-            $relatedList->tab = $tab->label;
+            $relatedlist->tab = $tab->label;
         } else {
-            $relatedList->tab = null;
+            $relatedlist->tab = null;
         }
 
         // Method
-        $defaultMethod = $relatedList->type === 'n-n' ? 'getRelatedList' : 'getDependentList';
-        $relatedList->method = $this->ask('Choose a method', $defaultMethod);
+        $defaultMethod = $relatedlist->type === 'n-n' ? 'getRelatedList' : 'getDependentList';
+        $relatedlist->method = $this->ask('Choose a method', $defaultMethod);
 
         // Actions
-        if ($relatedList->type === 'n-1') {
+        if ($relatedlist->type === 'n-1') {
             $actionsChoices = [
                 'add',
                 'Nothing'
@@ -782,41 +789,41 @@ class MakeModuleCommand extends Command
             ];
         }
         $actionsAnswer = $this->choice('Choose available actions', $actionsChoices, 'Nothing');
-        $relatedList->data->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
+        $relatedlist->data->actions = $actionsAnswer === 'Nothing' ? [] : explode(",", $actionsAnswer);
 
         // Icon
-        $relatedList->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
+        $relatedlist->icon = $this->ask('Icon CSS class name (See https://material.io/tools/icons)');
 
         // Sequence
-        if (count($this->module->relatedLists) > 0) {
+        if (count($this->module->relatedlists) > 0) {
 
             $choices = [];
-            foreach ($this->module->relatedLists as $moduleRelatedList) {
+            foreach ($this->module->relatedlists as $moduleRelatedList) {
                 $choices[] = 'Before - ' . $moduleRelatedList->label;
                 $choices[] = 'After - ' . $moduleRelatedList->label;
             }
 
             $position = $this->choice('Where do you want to add this related list?', $choices, $choices[count($choices)-1]);
-            $relatedListIndex = floor(array_search($position, $choices) / 2);
+            $relatedlistIndex = floor(array_search($position, $choices) / 2);
 
-            $relatedList->sequence = preg_match('`After`', $position) ? $relatedListIndex + 1 : $relatedListIndex;
+            $relatedlist->sequence = preg_match('`After`', $position) ? $relatedlistIndex + 1 : $relatedlistIndex;
 
         } else {
-            $relatedList->sequence = 0;
+            $relatedlist->sequence = 0;
         }
 
         // Update other related lists sequence
-        foreach ($this->module->relatedLists as &$moduleRelatedList) {
-            if ($moduleRelatedList->sequence >= $relatedList->sequence) {
+        foreach ($this->module->relatedlists as &$moduleRelatedList) {
+            if ($moduleRelatedList->sequence >= $relatedlist->sequence) {
                 $moduleRelatedList->sequence += 1;
             }
         }
 
         // Add related list
-        $this->module->relatedLists[] = $relatedList;
+        $this->module->relatedlists[] = $relatedlist;
 
         // Sort fields by sequence
-        usort($this->module->relatedLists, [$this, 'sortBySequence']);
+        usort($this->module->relatedlists, [$this, 'sortBySequence']);
 
         // Save module structure
         $this->saveModuleStructure();
@@ -840,9 +847,9 @@ class MakeModuleCommand extends Command
             $this->module->links = [];
         }
 
-        $link = new \StdClass();
+        $link = new \stdClass();
         $link->id = null;
-        $link->data = new \StdClass();
+        $link->data = new \stdClass();
 
         // Label
         $defaultLabel = 'link' . count($this->module->links);
@@ -901,7 +908,7 @@ class MakeModuleCommand extends Command
 
             $customize = $this->confirm('Do you want to customize the confirm dialog?', false);
             if ($customize) {
-                $link->data->dialog = new \StdClass();
+                $link->data->dialog = new \stdClass();
 
                 $link->data->dialog->title = $this->ask('Title', 'Are you sure?');
                 $link->data->dialog->confirmButtonText = $this->ask('Confirm button text', 'Yes');
@@ -923,7 +930,7 @@ class MakeModuleCommand extends Command
 
             // Ajax
             case 'ajax':
-                    $link->data->ajax = new \StdClass();
+                    $link->data->ajax = new \stdClass();
 
                     // HTTP method
                     $link->data->ajax->method = $this->choice('HTTP method', ['get', 'post', 'put', 'delete', 'head', 'patch', 'connect', 'options', 'trace'], 'get');
@@ -944,7 +951,7 @@ class MakeModuleCommand extends Command
 
             // Modal
             case 'modal':
-                    $link->data->modal = new \StdClass();
+                    $link->data->modal = new \stdClass();
                     $link->data->modal->id = $this->ask('What is the id of the modal to show? (e.g. productModal)');
                 break;
         }
@@ -1169,7 +1176,7 @@ class MakeModuleCommand extends Command
         $filters = $this->getFiltersMigration();
 
         // Related lists
-        $relatedLists = $this->getRelatedListsMigration();
+        $relatedlists = $this->getRelatedListsMigration();
 
         // Links
         $links = $this->getLinksMigration();
@@ -1205,7 +1212,7 @@ class MakeModuleCommand extends Command
                 $tableFields,
                 $tabsBlocksFields,
                 $filters,
-                $relatedLists,
+                $relatedlists,
                 $links,
             ],
             $fileContent
@@ -1615,7 +1622,7 @@ class MakeModuleCommand extends Command
      *
      * @param string|null $message
      * @param boolean $autoSelect
-     * @return \StdClass
+     * @return \stdClass
      */
     protected function selectTab($message = null, $autoSelect = true)
     {
@@ -1639,7 +1646,7 @@ class MakeModuleCommand extends Command
      *
      * @param string|null $message
      * @param boolean $autoSelect
-     * @return \StdClass
+     * @return \stdClass
      */
     protected function selectBlock($message = null, $autoSelect = true)
     {
@@ -1684,7 +1691,7 @@ class MakeModuleCommand extends Command
      * @param \Uccello\Core\Models\Module|null $module
      * @param string|null $message
      * @param boolean $autoSelect
-     * @return \StdClass
+     * @return \stdClass
      */
     protected function selectField(?Module $module, $message = null, $autoSelect = true)
     {
@@ -1749,7 +1756,7 @@ class MakeModuleCommand extends Command
      *
      * @param string|null $message
      * @param boolean $autoSelect
-     * @return \StdClass
+     * @return \stdClass
      */
     protected function selectRelatedList($message = null, $autoSelect = true)
     {
@@ -1773,7 +1780,7 @@ class MakeModuleCommand extends Command
      *
      * @param string|null $message
      * @param boolean $autoSelect
-     * @return \StdClass
+     * @return \stdClass
      */
     protected function selectLink($message = null, $autoSelect = true)
     {
@@ -1831,11 +1838,11 @@ class MakeModuleCommand extends Command
     /**
      * Sort $a and $b by sequence
      *
-     * @param \StdClass $a
-     * @param \StdClass $b
+     * @param \stdClass $a
+     * @param \stdClass $b
      * @return int
      */
-    protected function sortBySequence(\StdClass $a, \StdClass $b) {
+    protected function sortBySequence(\stdClass $a, \stdClass $b) {
         if ($a->sequence == $b->sequence) {
             return 0;
         }
@@ -1908,6 +1915,24 @@ class MakeModuleCommand extends Command
             if (count($packageParts) === 2) {
                 $basePath = 'packages/' . $packageParts[0] . '/' . $packageParts[1] . '/';
             }
+        }
+
+        return $basePath;
+    }
+
+     /**
+     * Delete module from designed_modules table
+     *
+     * @return void
+     */
+    protected function deleteDesignedModule()
+    {
+        // Search designed module by name
+        $designedModule = DesignedModule::where('name', $this->module->name);
+
+        // Delete if exists
+        if (!is_null($designedModule)) {
+            $designedModule->delete();
         }
     }
 }
