@@ -4,10 +4,12 @@
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Uccello\Core\Database\Eloquent\Model;
+use Uccello\Core\Support\Traits\UccelloModule;
 
 class ClassName extends Model
 {
     use SoftDeletes;
+    use UccelloModule;
 
     /**
      * The table associated with the model.
