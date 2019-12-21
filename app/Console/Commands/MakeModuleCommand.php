@@ -5,6 +5,7 @@ namespace Uccello\ModuleDesigner\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Lang;
 use Uccello\Core\Models\Uitype;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Field;
@@ -62,7 +63,7 @@ class MakeModuleCommand extends Command
 
         $this->files = $files;
 
-        $this->locale = \Lang::getLocale();
+        $this->locale = Lang::getLocale();
     }
 
     /**
@@ -1304,7 +1305,7 @@ class MakeModuleCommand extends Command
                                     "            'module_id' => \$module->id,\n".
                                     "            'label' => '$_tab->label',\n".
                                     "            'icon' => $icon,\n".
-                                    "            'sequence' => $_tab->sequence,\n".
+                                    "            'sequence' => \$module->tabs()->count(),\n".
                                     "            'data' => $data\n".
                                     "        ]);\n";
 
@@ -1325,7 +1326,7 @@ class MakeModuleCommand extends Command
                                             "            'tab_id' => \$tab->id,\n".
                                             "            'label' => '$_block->label',\n".
                                             "            'icon' => $icon,\n".
-                                            "            'sequence' => $_block->sequence,\n".
+                                            "            'sequence' => \$tab->blocks()->count(),\n".
                                             "            'data' => $data\n".
                                             "        ]);\n";
 
@@ -1345,7 +1346,7 @@ class MakeModuleCommand extends Command
                                             "            'name' => '$_field->name',\n".
                                             "            'uitype_id' => uitype('$_field->uitype')->id,\n".
                                             "            'displaytype_id' => displaytype('$_field->displaytype')->id,\n".
-                                            "            'sequence' => $_field->sequence,\n".
+                                            "            'sequence' => \$block->fields()->count(),\n".
                                             "            'data' => $data\n".
                                             "        ]);\n";
                             }
@@ -1431,7 +1432,7 @@ class MakeModuleCommand extends Command
                                 "            'type' => '$_relatedlist->type',\n".
                                 "            'method' => '$_relatedlist->method',\n".
                                 "            'data' => $data,\n".
-                                "            'sequence' => $_relatedlist->sequence\n".
+                                "            'sequence' => \$module->relatedlists()->count()\n".
                                 "        ]);\n";
             }
         }
@@ -1461,9 +1462,8 @@ class MakeModuleCommand extends Command
                                 "            'icon' => $icon,\n".
                                 "            'type' => '$_link->type',\n".
                                 "            'url' => '$_link->url',\n".
-                                "            'sequence' => '$_link->sequence',\n".
+                                "            'sequence' => \$module->links()->count(),\n".
                                 "            'data' => $data,\n".
-                                "            'sequence' => $_link->sequence\n".
                                 "        ]);\n";
             }
         }
