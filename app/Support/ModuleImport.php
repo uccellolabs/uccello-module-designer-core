@@ -734,8 +734,8 @@ class ModuleImport
             $subDirectories = implode('/', $modelClassData);
 
             // Create sub directories if not exist
-            if (!$this->files->isDirectory($this->filePath.'/app/'.$subDirectories)) {
-                $this->files->makeDirectory($this->filePath.'/app/'.$subDirectories, 0755, true); // Recursive
+            if (!$this->files->isDirectory($this->filePath.'/src/'.$subDirectories)) {
+                $this->files->makeDirectory($this->filePath.'/src/'.$subDirectories, 0755, true); // Recursive
             }
 
             $subDirectories .= '/';
@@ -748,7 +748,7 @@ class ModuleImport
         $tablePrefix = $this->structure->tablePrefix;
 
         // File path
-        $modelFile = $this->filePath.'app/'.$subDirectories.$className.'.php';
+        $modelFile = $this->filePath.'src/'.$subDirectories.$className.'.php';
 
         // Check if file already exists
         if ($this->files->exists($modelFile)) {
