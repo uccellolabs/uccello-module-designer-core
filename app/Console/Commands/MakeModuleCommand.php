@@ -139,7 +139,7 @@ class MakeModuleCommand extends Command
         elseif ($choice === $editModuleChoice) {
             $module = $this->selectModule('Select the module you want to edit');
 
-            $import = new ModuleExport($this->files, $this);
+            $import = new ModuleExport($this);
             $this->module = $import->getStructure($module);
 
             // Show an error if the module is already being edited
@@ -1124,7 +1124,7 @@ class MakeModuleCommand extends Command
         // Check module existence
         $this->checkModuleExistence();
 
-        $import = new ModuleImport($this->files, $this);
+        $import = new ModuleImport($this);
         $import->install($this->module);
 
         Artisan::call('cache:clear');

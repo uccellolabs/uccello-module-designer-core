@@ -25,13 +25,6 @@ class ModuleExport
     protected $filePath;
 
     /**
-     * Filesystem implementation
-     *
-     * @var \Illuminate\Filesystem\Filesystem
-     */
-    protected $files;
-
-    /**
      * Command implementation to be able to display message in the console
      *
      * @var \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand
@@ -41,19 +34,10 @@ class ModuleExport
     /**
      * Constructor
      *
-     * @param \Illuminate\Filesystem\Filesystem $files
-     * @return void
-     */
-    /**
-     * Undocumented function
-     *
-     * @param \Illuminate\Filesystem\Filesystem $files
      * @param \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand|null $output
      */
-    public function __construct(Filesystem $files, $command)
+    public function __construct($command = null)
     {
-        $this->files = $files;
-
         $this->command = $command;
     }
 
@@ -266,26 +250,26 @@ class ModuleExport
             $this->structure->lang = new \StdClass();
         }
 
-        if (!$this->files->exists($this->filePath.'resources/lang')) {
+        if (!File::exists($this->filePath.'resources/lang')) {
             return;
         }
 
         // Retrieve all languages (one directory represents one language)
-        $languageDirectories = $this->files->directories($this->filePath.'resources/lang');
+        $languageDirectories = File::directories($this->filePath.'resources/lang');
 
         foreach ($languageDirectories as $languageDirectory) {
-            $lang = $this->files->basename($languageDirectory);
+            $lang = File::basename($languageDirectory);
 
             $this->structure->lang->{$lang} = new \StdClass();
 
             // Get module translations
             $moduleTranslationFile = $this->filePath.'resources/lang/'.$lang.'/'.$this->structure->name.'.php';
 
-            if ($this->files->exists($moduleTranslationFile)) {
-                $translations = $this->files->getRequire($moduleTranslationFile);
+            if (File::exists($moduleTranslationFile)) {
+                $translations = File::getRequire($moduleTranslationFile);
                 $this->structure->lang->{$lang} = json_decode(json_encode($translations)); // To force object instead of array
             }
-            
+
         }
     }
 

@@ -2,9 +2,9 @@
 
 namespace Uccello\ModuleDesigner\Support;
 
-use Schema;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Block;
@@ -32,13 +32,6 @@ class ModuleImport
     protected $filePath;
 
     /**
-     * Filesystem implementation
-     *
-     * @var \Illuminate\Filesystem\Filesystem
-     */
-    protected $files;
-
-    /**
      * Command implementation to be able to display message in the console
      *
      * @var \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand
@@ -64,10 +57,8 @@ class ModuleImport
      * @param \Illuminate\Filesystem\Filesystem $files
      * @param \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand|null $output
      */
-    public function __construct(Filesystem $files, $command)
+    public function __construct($command = null)
     {
-        $this->files = $files;
-
         $this->command = $command;
     }
 
@@ -96,6 +87,8 @@ class ModuleImport
         // Create default filter
         $this->createDefaultFilter($module);
 
+        $this->createFilters($module);
+
         // Create related lists
         $this->createRelatedLists($module);
 
@@ -117,11 +110,15 @@ class ModuleImport
         $this->filePath = '';
 
         if (isset($this->structure->data->package)) {
-            // Extract vendor and package names
-            $packageParts = explode('/', $this->structure->data->package);
+            if ($this->structure->data->package === 'app') {
+                $this->filePath = base_path();
+            } else {
+                // Extract vendor and package names
+                $packageParts = explode('/', $this->structure->data->package);
 
-            if (count($packageParts) === 2) {
-                $this->filePath = 'packages/'.$packageParts[ 0 ].'/'.$packageParts[ 1 ].'/';
+                if (count($packageParts) === 2) {
+                    $this->filePath = 'packages/'.$packageParts[ 0 ].'/'.$packageParts[ 1 ].'/';
+                }
             }
         }
     }
@@ -154,7 +151,6 @@ class ModuleImport
         // Create tabs
         if (isset($this->structure->tabs)) {
             foreach ($this->structure->tabs as $_tab) {
-
                 $tab = Tab::findOrNew($_tab->id);
                 $tab->label = $_tab->label;
                 $tab->module_id = $module->id;
@@ -371,7 +367,7 @@ class ModuleImport
 
         if (!Schema::hasTable($tableName)) {
             // Create table
-            Schema::create($tableName, function(Blueprint $table) use ($module) {
+            Schema::create($tableName, function (Blueprint $table) use ($module) {
                 $table->increments('id');
 
                 // Create each column according to the selected uitype
@@ -417,10 +413,9 @@ class ModuleImport
             if (!is_null($this->command)) {
                 $this->command->line('The table <info>'.$tableName.'</info> was created.');
             }
-
         } else {
             // Update table
-            Schema::table($tableName, function(Blueprint $table) use ($module, $tableName) {
+            Schema::table($tableName, function (Blueprint $table) use ($module, $tableName) {
                 // Create each column according to the selected uitype
                 if (!empty($this->structure->tabs)) {
                     foreach ($this->structure->tabs as $_tabs) {
@@ -461,7 +456,6 @@ class ModuleImport
 
                 // Drop old columns
                 foreach ($this->fieldsToDelete as $field) {
-
                     // Check if the column exists
                     $columnExists = Schema::hasColumn($tableName, $field->column);
 
@@ -530,25 +524,62 @@ class ModuleImport
         // Add all field in the filter
         $columns = [ ];
         foreach ($this->getAllFields() as $field) {
-            if ($field->displayInFilter === true) {
+            if (isset($field->displayInFilter) && $field->displayInFilter === true) {
                 $columns[ ] = $field->name;
             }
         }
 
-        $filter = Filter::firstOrNew([
-            "module_id" => $module->id,
-            "domain_id" => null,
-            "user_id" => null,
-            "name" => 'filter.all',
-            "type" => 'list',
-        ]);
-        $filter->columns = $columns;
-        $filter->conditions = null;
-        $filter->order = null;
-        $filter->is_default = true;
-        $filter->is_public = false;
-        $filter->data = [ 'readonly' => true ];
-        $filter->save();
+        if ($columns) {
+            $filter = Filter::firstOrNew([
+                "module_id" => $module->id,
+                "domain_id" => null,
+                "user_id" => null,
+                "name" => 'filter.all',
+                "type" => 'list',
+            ]);
+            $filter->columns = $columns;
+            $filter->conditions = null;
+            $filter->order = null;
+            $filter->is_default = true;
+            $filter->is_public = false;
+            $filter->data = [ 'readonly' => true ];
+            $filter->save();
+        }
+    }
+
+    /**
+     * Create all filters
+     *
+     * @param \Uccello\Core\Models\Module $module
+     * @return void
+     */
+    protected function createFilters(Module $module)
+    {
+        if (!isset($this->structure->filters)) {
+            return;
+        }
+
+        // Add all field in the filter
+        foreach ($this->structure->filters as $_filter) {
+            $columns = [ ];
+            foreach ($_filter->columns as $column) {
+                $columns[ ] = $column;
+            }
+            $filter = Filter::firstOrNew([
+                "module_id" => $module->id,
+                "domain_id" => null,
+                "user_id" => null,
+                "name" => 'filter.'.$_filter->name,
+                "type" => 'list',
+            ]);
+            $filter->columns = $columns;
+            $filter->conditions = null;
+            $filter->order = null;
+            $filter->is_default = true;
+            $filter->is_public = false;
+            $filter->data = [ 'readonly' => true ];
+            $filter->save();
+        }
     }
 
     /**
@@ -647,14 +678,12 @@ class ModuleImport
     protected function createLanguageFiles(Module $module)
     {
         foreach ($this->structure->lang as $locale => $translations) {
-
-            $languageFile = $this->filePath.'resources/lang/'.$locale.'/'.$this->structure->name.'.php';
+            $languageFile = $this->filePath.'/resources/lang/'.$locale.'/'.$this->structure->name.'.php';
 
             // If file exists then update translations
-            if ($this->files->exists($languageFile)) {
-
+            if (File::exists($languageFile)) {
                 // Get old translations ($languageFile returns an array)
-                $fileTranslations = $this->files->getRequire($languageFile);
+                $fileTranslations = File::getRequire($languageFile);
 
                 // Add or update translations ($translations have priority)
                 $translations = array_merge((array)$fileTranslations, (array)$translations);
@@ -691,11 +720,11 @@ class ModuleImport
 
         // Create language directory if necessary
         $directory = dirname($filepath);
-        if (!$this->files->isDirectory($directory)) {
-            $this->files->makeDirectory($directory, 0755, true); // Recursive
+        if (!File::isDirectory($directory)) {
+            File::makeDirectory($directory, 0755, true); // Recursive
         }
 
-        $this->files->put($filepath, $content);
+        File::put($filepath, $content);
     }
 
     /**
@@ -709,11 +738,17 @@ class ModuleImport
         // Check model stub file existence (from module-designer package)
         $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
 
-        if (!$this->files->exists($stubsDirectory.'/model.stub')) {
+        if (!File::exists($stubsDirectory.'/model.stub')) {
             if (!is_null($this->command)) {
                 $this->command->line('<error>You have to install module-designer to generate the model file</error> : <comment>composer require uccello/module-designer</comment>');
             }
             return;
+        }
+
+        if (File::isDirectory($this->filePath.'/src')) {
+            $basePath = $this->filePath.'/src/';
+        } elseif (File::isDirectory($this->filePath.'/app')) {
+            $basePath = $this->filePath.'/app/';
         }
 
         $modelClassData = explode('\\', $this->structure->model);
@@ -734,8 +769,8 @@ class ModuleImport
             $subDirectories = implode('/', $modelClassData);
 
             // Create sub directories if not exist
-            if (!$this->files->isDirectory($this->filePath.'/src/'.$subDirectories)) {
-                $this->files->makeDirectory($this->filePath.'/src/'.$subDirectories, 0755, true); // Recursive
+            if (!File::isDirectory($basePath.$subDirectories)) {
+                File::makeDirectory($basePath.$subDirectories, 0755, true); // Recursive
             }
 
             $subDirectories .= '/';
@@ -748,15 +783,15 @@ class ModuleImport
         $tablePrefix = $this->structure->tablePrefix;
 
         // File path
-        $modelFile = $this->filePath.'src/'.$subDirectories.$className.'.php';
+        $modelFile = $basePath.$subDirectories.$className.'.php';
 
         // Check if file already exists
-        if ($this->files->exists($modelFile)) {
+        if (File::exists($modelFile)) {
             if (!is_null($this->command)) {
                 $modelFileCopy = str_replace('.php', '.prev.php', $modelFile);
-                $this->files->move($modelFile, $modelFileCopy);
+                File::move($modelFile, $modelFileCopy);
                 $this->command->line('<error>WARNING:</error> The file <info>'.$modelFile.'</info> already exists. '.
-                    'It was <comment>renamed</comment> into <info>'.$this->files->basename($modelFileCopy).'</info>.'
+                    'It was <comment>renamed</comment> into <info>'.File::basename($modelFileCopy).'</info>.'
                 );
             }
         }
@@ -786,8 +821,7 @@ class ModuleImport
             }
         }
 
-        if(isset($this->structure->relatedLists))
-        {
+        if (isset($this->structure->relatedLists)) {
             foreach ($this->structure->relatedlists as $relatedList) {
                 if ($relatedList->type !== 'n-n') {
                     continue;
@@ -803,7 +837,7 @@ class ModuleImport
         }
 
         // Generate content
-        $fileContent = $this->files->get($stubsDirectory.'/model.stub');
+        $fileContent = File::get($stubsDirectory.'/model.stub');
 
         $content = str_replace(
             [
@@ -823,7 +857,7 @@ class ModuleImport
             $fileContent
         );
 
-        $this->files->put($modelFile, $content);
+        File::put($modelFile, $content);
 
         if (!is_null($this->command)) {
             $this->command->line('The file <info>'.$modelFile.'</info> was created.');
@@ -872,44 +906,32 @@ class ModuleImport
 
     protected function arrayReadableEncode($in, $indent = 0, $from_array = false)
     {
-        $_escape = function ($str)
-        {
+        $_escape = function ($str) {
             return preg_replace("!([\b\t\n\r\f\"\\'])!", "\\\\\\1", $str);
         };
 
         $out = '';
 
-        foreach ($in as $key=>$value)
-        {
+        foreach ($in as $key => $value) {
             $out .= str_repeat("    ", $indent + 1);
             $out .= "'".$_escape((string)$key)."' => ";
 
-            if (is_object($value) || is_array($value))
-            {
+            if (is_object($value) || is_array($value)) {
                 $out .= $this->arrayReadableEncode($value, $indent + 1);
-            }
-            elseif (is_bool($value))
-            {
+            } elseif (is_bool($value)) {
                 $out .= $value ? 'true' : 'false';
-            }
-            elseif (is_null($value))
-            {
+            } elseif (is_null($value)) {
                 $out .= 'null';
-            }
-            elseif (is_string($value))
-            {
+            } elseif (is_string($value)) {
                 $out .= "'" . $_escape($value) ."'";
-            }
-            else
-            {
+            } else {
                 $out .= $value;
             }
 
             $out .= ",\n";
         }
 
-        if (!empty($out))
-        {
+        if (!empty($out)) {
             $out = substr($out, 0, -2);
         }
 
