@@ -107,7 +107,7 @@ class ModuleImport
 
     protected function initFilePath()
     {
-        $this->filePath = '';
+        $this->filePath = base_path();
 
         if (isset($this->structure->data->package)) {
             if ($this->structure->data->package === 'app') {
@@ -117,7 +117,7 @@ class ModuleImport
                 $packageParts = explode('/', $this->structure->data->package);
 
                 if (count($packageParts) === 2) {
-                    $this->filePath = 'packages/'.$packageParts[ 0 ].'/'.$packageParts[ 1 ].'/';
+                    $this->filePath =  base_path('packages/'.$packageParts[ 0 ].'/'.$packageParts[ 1 ]);
                 }
             }
         }

@@ -2,10 +2,10 @@
 
 namespace Uccello\ModuleDesigner\Support;
 
-use Illuminate\Filesystem\Filesystem;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
 use Uccello\Core\Models\Field;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class ModuleExport
@@ -82,6 +82,7 @@ class ModuleExport
         $this->initFilePath($module);
         $this->generateModuleStructure($module);
         $this->generateTabsBlocksFieldsStructure($module);
+        $this->generateFiltersStructure($module);
         $this->generateRelatedListsStructure($module);
         $this->generateLinksStructure($module);
         $this->generateTranslationsStructure($module);
@@ -97,6 +98,7 @@ class ModuleExport
     {
         $this->structure = new \StdClass();
         $this->structure->name = $module->name;
+        $this->structure->label = uctrans($module->name, $module);
         $this->structure->icon = $module->icon;
         $this->structure->model = $module->model_class;
         $this->structure->data = $module->data;
@@ -123,7 +125,8 @@ class ModuleExport
      * @param \Uccello\Core\Models\Module $module
      * @return void
      */
-    protected function generateTabsBlocksFieldsStructure(Module $module) {
+    protected function generateTabsBlocksFieldsStructure(Module $module)
+    {
         if (empty($this->structure->tabs)) {
             $this->structure->tabs = [ ];
         }
@@ -144,6 +147,7 @@ class ModuleExport
                 $_block->fields = [ ];
                 $_block->id = $block->id;
                 $_block->label = $block->label;
+                $_block->labelTranslated = uctrans($block->label, $module);
                 $_block->icon = $block->icon;
                 $_block->sequence = $block->sequence;
                 $_block->data = $block->data;
@@ -154,6 +158,7 @@ class ModuleExport
                     $_field = new \StdClass();
                     $_field->id = $field->id;
                     $_field->name = $field->name;
+                    $_field->label = uctrans('field.'.$field->name, $module);
                     $_field->uitype = uitype($field->uitype_id)->name;
                     $_field->displaytype = displaytype($field->displaytype_id)->name;
                     $_field->sequence = $field->sequence;
@@ -169,12 +174,46 @@ class ModuleExport
     }
 
     /**
+     * Generate filters exportable structure
+     *
+     * @param \Uccello\Core\Models\Module $module
+     * @return void
+     */
+    protected function generateFiltersStructure(Module $module)
+    {
+        if (empty($this->structure->filters)) {
+            $this->structure->filters = [ ];
+        }
+
+        // Get default filters
+        $filters = $module->filters()->whereNull('domain_id')
+            ->whereNull('user_id')
+            ->get();
+
+        foreach ($filters as $filter) {
+            $_filter = new \StdClass();
+            $_filter->name = $filter->name;
+            $_filter->label = uctrans($filter->name, $module);
+            $_filter->type = $filter->type;
+            $_filter->columns = $filter->columns;
+            $_filter->conditions = $filter->conditions;
+            $_filter->order = $filter->order;
+            $_filter->is_default = $filter->order;
+            $_filter->is_public = $filter->is_public;
+            $_filter->data = $filter->data;
+
+            $this->structure->filters[ ] = $_filter;
+        }
+    }
+
+    /**
      * Generate related lists exportable structure
      *
      * @param \Uccello\Core\Models\Module $module
      * @return void
      */
-    protected function generateRelatedListsStructure(Module $module) {
+    protected function generateRelatedListsStructure(Module $module)
+    {
         if (empty($this->structure->relatedlists)) {
             $this->structure->relatedlists = [ ];
         }
@@ -219,7 +258,8 @@ class ModuleExport
      * @param \Uccello\Core\Models\Module $module
      * @return void
      */
-    protected function generateLinksStructure(Module $module) {
+    protected function generateLinksStructure(Module $module)
+    {
         if (empty($this->structure->links)) {
             $this->structure->links = [ ];
         }
@@ -269,7 +309,6 @@ class ModuleExport
                 $translations = File::getRequire($moduleTranslationFile);
                 $this->structure->lang->{$lang} = json_decode(json_encode($translations)); // To force object instead of array
             }
-
         }
     }
 
