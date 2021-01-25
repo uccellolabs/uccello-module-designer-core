@@ -3,7 +3,7 @@
     "description": "Module designer for Uccello.",
     "type": "library",
     "require": {
-        "uccello/uccello": "1.*"
+        "uccello/uccello": "^2.0"
     },
     "license": "MIT",
     "authors": [
@@ -25,8 +25,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider",
-                "Uccello\\ModuleDesigner\\Providers\\RouteServiceProvider"
+                "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider"
             ]
         }
     }
