@@ -1,6 +1,6 @@
 <?php
 
-namespace Uccello\ModuleDesigner\Console\Commands;
+namespace Uccello\ModuleDesignerCore\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
@@ -10,9 +10,9 @@ use Uccello\Core\Models\Uitype;
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Displaytype;
-use Uccello\ModuleDesigner\Support\ModuleImport;
-use Uccello\ModuleDesigner\Support\ModuleExport;
-use Uccello\ModuleDesigner\Models\DesignedModule;
+use Uccello\ModuleDesignerCore\Support\ModuleImport;
+use Uccello\ModuleDesignerCore\Support\ModuleExport;
+use Uccello\ModuleDesignerCore\Models\DesignedModule;
 use Illuminate\Support\Str;
 
 class MakeModuleCommand extends Command

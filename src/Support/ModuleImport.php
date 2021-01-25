@@ -1,6 +1,6 @@
 <?php
 
-namespace Uccello\ModuleDesigner\Support;
+namespace Uccello\ModuleDesignerCore\Support;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
@@ -13,7 +13,7 @@ use Uccello\Core\Models\Filter;
 use Uccello\Core\Models\Relatedlist;
 use Uccello\Core\Models\Domain;
 use Uccello\Core\Models\Link;
-use Uccello\ModuleDesigner\Models\DesignedModule;
+use Uccello\ModuleDesignerCore\Models\DesignedModule;
 
 class ModuleImport
 {
@@ -34,7 +34,7 @@ class ModuleImport
     /**
      * Command implementation to be able to display message in the console
      *
-     * @var \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand
+     * @var \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand
      */
     protected $command;
 
@@ -55,7 +55,7 @@ class ModuleImport
      * Undocumented function
      *
      * @param \Illuminate\Filesystem\Filesystem $files
-     * @param \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand|null $output
+     * @param \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand|null $output
      */
     public function __construct($command = null)
     {
