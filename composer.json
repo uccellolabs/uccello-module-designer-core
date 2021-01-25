@@ -1,5 +1,5 @@
 {
-    "name": "uccello/module-designer",
+    "name": "uccello/module-designer-core",
     "description": "Module designer for Uccello.",
     "type": "library",
     "require": {
