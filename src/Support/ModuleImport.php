@@ -1,8 +1,9 @@
 <?php
 
-namespace Uccello\ModuleDesigner\Support;
+namespace Uccello\ModuleDesignerCore\Support;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Uccello\Core\Models\Module;
@@ -12,8 +13,7 @@ use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Filter;
 use Uccello\Core\Models\Relatedlist;
 use Uccello\Core\Models\Domain;
-use Uccello\Core\Models\Link;
-use Uccello\ModuleDesigner\Models\DesignedModule;
+use Uccello\ModuleDesignerCore\Models\DesignedModule;
 
 class ModuleImport
 {
@@ -34,7 +34,7 @@ class ModuleImport
     /**
      * Command implementation to be able to display message in the console
      *
-     * @var \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand
+     * @var \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand
      */
     protected $command;
 
@@ -55,7 +55,7 @@ class ModuleImport
      * Undocumented function
      *
      * @param \Illuminate\Filesystem\Filesystem $files
-     * @param \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand|null $output
+     * @param \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand|null $output
      */
     public function __construct($command = null)
     {
@@ -91,9 +91,6 @@ class ModuleImport
 
         // Create related lists
         $this->createRelatedLists($module);
-
-        // Create links
-        $this->createLinks($module);
 
         // Create language files
         $this->createLanguageFiles($module);
@@ -218,9 +215,6 @@ class ModuleImport
 
         // Delete related lists
         $this->deleteObsoleteRelatedLists($module);
-
-        // Delete links
-        $this->deleteObsoleteLinks($module);
     }
 
     /**
@@ -326,31 +320,6 @@ class ModuleImport
 
             if (!$found) {
                 $relatdlist->delete();
-            }
-        }
-    }
-
-    /**
-     * Delete obsolete links if necessary
-     *
-     * @param \Uccello\Core\Models\Module $module
-     * @return void
-     */
-    protected function deleteObsoleteLinks(Module $module)
-    {
-        foreach ($module->links as $link) {
-            $found = false;
-
-            // Search related list in the new structure
-            foreach ($this->structure->links as $_link) {
-                if ($link->id === $_link->id) {
-                    $found = true;
-                    break;
-                }
-            }
-
-            if (!$found) {
-                $link->delete();
             }
         }
     }
@@ -630,30 +599,6 @@ class ModuleImport
     }
 
     /**
-     * Create all links
-     *
-     * @param \Uccello\Core\Models\Module $module
-     * @return void
-     */
-    protected function createLinks(Module $module)
-    {
-        if (isset($this->structure->links)) {
-            foreach ($this->structure->links as $_link) {
-                $link = Link::firstOrNew([
-                    "module_id" => $module->id,
-                    "label" => $_link->label,
-                ]);
-                $link->icon = $_link->icon;
-                $link->type = $_link->type;
-                $link->url = $_link->url;
-                $link->data = $_link->data;
-                $link->sequence = $_link->sequence;
-                $link->save();
-            }
-        }
-    }
-
-    /**
      * Activate module on all domains
      *
      * @param \Uccello\Core\Models\Module $module
@@ -735,12 +680,12 @@ class ModuleImport
      */
     protected function createModelFile(Module $module)
     {
-        // Check model stub file existence (from module-designer package)
-        $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
+        // Check model stub file existence (from module-designer-core package)
+        $stubsDirectory = base_path('vendor/uccello/module-designer-core/src/Console/Commands/stubs');
 
         if (!File::exists($stubsDirectory.'/model.stub')) {
             if (!is_null($this->command)) {
-                $this->command->line('<error>You have to install module-designer to generate the model file</error> : <comment>composer require uccello/module-designer</comment>');
+                $this->command->line('<error>You have to install module-designer-core to generate the model file</error> : <comment>composer require uccello/module-designer-core</comment>');
             }
             return;
         }
@@ -762,8 +707,8 @@ class ModuleImport
         // Extract subdirectories
         $subDirectories = '';
         if (count($modelClassData) > 2) {
-            array_pull($modelClassData, 0); // Remove first element: Vendor
-            array_pull($modelClassData, 1); // Remove second element: Package
+            Arr::pull($modelClassData, 0); // Remove first element: Vendor
+            Arr::pull($modelClassData, 1); // Remove second element: Package
 
             // Now it remains only the subdirectories
             $subDirectories = implode('/', $modelClassData);

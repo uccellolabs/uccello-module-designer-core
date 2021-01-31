@@ -1,6 +1,6 @@
 <?php
 
-namespace Uccello\ModuleDesigner\Models;
+namespace Uccello\ModuleDesignerCore\Models;
 
 use Uccello\Core\Database\Eloquent\Model;
 

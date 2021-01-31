@@ -1,9 +1,9 @@
 {
-    "name": "uccello/module-designer",
+    "name": "uccello/module-designer-core",
     "description": "Module designer for Uccello.",
     "type": "library",
     "require": {
-        "uccello/uccello": "1.*"
+        "uccello/uccello": "^2.0"
     },
     "license": "MIT",
     "authors": [
@@ -14,19 +14,18 @@
     ],
     "autoload": {
         "psr-4": {
-            "Uccello\\ModuleDesigner\\": "app/"
+            "Uccello\\ModuleDesignerCore\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Uccello\\ModuleDesigner\\Tests\\": "tests/"
+            "Uccello\\ModuleDesignerCore\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Uccello\\ModuleDesigner\\Providers\\AppServiceProvider",
-                "Uccello\\ModuleDesigner\\Providers\\RouteServiceProvider"
+                "Uccello\\ModuleDesignerCore\\Providers\\AppServiceProvider"
             ]
         }
     }

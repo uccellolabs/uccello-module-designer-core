@@ -1,6 +1,6 @@
 <?php
 
-namespace Uccello\ModuleDesigner\Support;
+namespace Uccello\ModuleDesignerCore\Support;
 
 use Uccello\Core\Models\Module;
 use Uccello\Core\Models\Tab;
@@ -27,14 +27,14 @@ class ModuleExport
     /**
      * Command implementation to be able to display message in the console
      *
-     * @var \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand
+     * @var \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand
      */
     protected $command;
 
     /**
      * Constructor
      *
-     * @param \Illuminate\Console\Command|Uccello\ModuleDesigner\Console\Commands\MakeModuleCommand|null $output
+     * @param \Illuminate\Console\Command|Uccello\ModuleDesignerCore\Console\Commands\MakeModuleCommand|null $output
      */
     public function __construct($command = null)
     {
