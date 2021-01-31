@@ -10,7 +10,6 @@ use Uccello\Core\Models\Block;
 use Uccello\Core\Models\Field;
 use Uccello\Core\Models\Filter;
 use Uccello\Core\Models\Relatedlist;
-use Uccello\Core\Models\Link;
 
 class ClassName extends Migration
 {
@@ -27,7 +26,6 @@ class ClassName extends Migration
         $this->createTabsBlocksFields($module);
         $this->createFilters($module);
         $this->createRelatedLists($module);
-        $this->createLinks($module);
     }
 
     /**
@@ -91,9 +89,5 @@ class ClassName extends Migration
 
     protected function createRelatedLists($module)
     {// %relatedlists%
-    }
-
-    protected function createLinks($module)
-    {// %links%
     }
 }

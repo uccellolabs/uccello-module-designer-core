@@ -312,7 +312,7 @@ class MakeModuleCommand extends Command
         $moduleName = $this->ask('What is the module name? (e.g. book-type)');
 
         // The snake_case function converts the given string to snake_case
-        $moduleName = snake_case($moduleName);
+        $moduleName = Str::snake($moduleName);
 
         // If module name is not defined, ask again
         if (!$moduleName) {
@@ -341,14 +341,14 @@ class MakeModuleCommand extends Command
         $this->module->lang->{$this->locale}->link = new \stdClass();
 
         // Name
-        $this->module->name = kebab_case($moduleName);
+        $this->module->name = Str::kebab($moduleName);
 
         // Translation
         $this->module->lang->{$this->locale}->{$this->module->name} = $this->ask('Translation plural [' . $this->locale . ']');
         // $this->module->lang->{$this->locale}->{'single.' . $this->module->name} = $this->ask('Translation single [' . $this->locale . ']');
 
         // Model class
-        $defaultModelClass = 'App\\' . studly_case($moduleName); // The studly_case function converts the given string to StudlyCase
+        $defaultModelClass = 'App\\' . Str::studly($moduleName); // The studly_case function converts the given string to StudlyCase
         $this->module->model = $this->ask('Model class', $defaultModelClass);
 
         // Package
@@ -367,7 +367,7 @@ class MakeModuleCommand extends Command
         }
 
         // Table name
-        $this->module->tableName = $this->ask('Table name', str_plural($this->module->name));
+        $this->module->tableName = $this->ask('Table name', Str::plural($this->module->name));
 
         // Table prefix
         if (!empty($this->module->data->package)) {
@@ -606,7 +606,7 @@ class MakeModuleCommand extends Command
 
         // Name
         $field->name = $this->ask('Field name');
-        $field->name = snake_case($field->name);
+        $field->name = Str::snake($field->name);
 
         // Check if the name already exists
         foreach ($moduleFields as $moduleField) {
@@ -1140,11 +1140,11 @@ class MakeModuleCommand extends Command
      */
     protected function makeMigration()
     {
-        // Check migration stub file existence (from module-designer package)
-        $stubsDirectory = base_path('vendor/uccello/module-designer/app/Console/Commands/stubs');
+        // Check migration stub file existence (from module-designer-core package)
+        $stubsDirectory = base_path('vendor/uccello/module-designer-core/src/Console/Commands/stubs');
 
         if (!$this->files->exists($stubsDirectory . '/module_migration.stub')) {
-            $this->line('<error>You have to install module-designer to generate the migration file</error> : <comment>composer require uccello/module-designer</comment>');
+            $this->line('<error>You have to install module-designer-core to generate the migration file</error> : <comment>composer require uccello/module-designer-core</comment>');
             return;
         }
 
